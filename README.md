@@ -6,13 +6,34 @@ Small, self-contained web apps for personal use. Each app lives in its own top-l
 
 - [`todo-list/`](./todo-list) — Cute 10-task to-do list with completion animations.
 
-## Deploying to Cloudflare Pages
+## Layout
 
-You can host every app from this one repo without splitting into separate repos:
+Each app is one top-level folder holding its own `wrangler.jsonc`, and serves
+static files from a `public/` subfolder:
 
-1. In the Cloudflare dashboard, go to **Workers & Pages → Create → Pages → Connect to Git** and pick this repo.
-2. Set **Build output directory** (a.k.a. root directory) to the app's folder, e.g. `todo-list`.
-3. Leave the build command empty (these are static files).
-4. Repeat steps 1–3 for each app, creating one Cloudflare Pages project per folder. Each gets its own `*.pages.dev` URL (and you can attach a custom subdomain).
+```
+todo-list/
+  wrangler.jsonc   # worker name + assets config
+  package.json     # present so the build's install step has something to run
+  public/
+    index.html     # everything served publicly lives here
+```
 
-Adding a new app later just means adding a new top-level folder and creating one more Pages project pointed at it — no repo restructuring needed.
+Keeping the served files in `public/` matters: if `assets.directory` points at
+the app folder itself, `wrangler.jsonc`, `package.json`, and anything npm
+generates during the build all get published as public assets too.
+
+## Deploying to Cloudflare (Workers Builds)
+
+One Cloudflare Worker per app, all from this single repo:
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Import a repository**, pick this repo.
+2. **Root directory**: the app's folder, e.g. `todo-list`.
+3. **Build command**: leave empty. **Deploy command**: `npx wrangler deploy`.
+4. **Production branch**: the branch the app's folder actually exists on.
+5. In the app's `wrangler.jsonc`, `name` must exactly match the Worker's name in
+   the dashboard, or the deploy targets the wrong Worker and the Git connection
+   breaks.
+
+Adding a new app later means a new top-level folder (with its own
+`wrangler.jsonc` and `public/`) and one more Worker pointed at it.
