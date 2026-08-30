@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cute To-Do</title>
+<meta name="description" content="A cute 10-task to-do list with satisfying complete animations." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌸</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pink: #ff9fc7;
+    --pink-deep: #ff6fa5;
+    --lavender: #c9b6ff;
+    --mint: #a6e3c4;
+    --peach: #ffd9a0;
+    --cream: #fff8f2;
+    --card: #ffffff;
+    --ink: #5c4a5e;
+    --ink-soft: #9c8aa0;
+    --line: #f1e3ea;
+    --shadow: 0 12px 30px rgba(255, 141, 179, 0.25);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:'Quicksand', sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 12% 15%, #ffe1ee 0%, transparent 45%),
+      radial-gradient(circle at 85% 10%, #dcefff 0%, transparent 40%),
+      radial-gradient(circle at 90% 85%, #e3ffe8 0%, transparent 45%),
+      linear-gradient(160deg, #fff5f8 0%, #fdf2ff 50%, #f2f8ff 100%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 32px 16px;
+    position:relative;
+    overflow-x:hidden;
+  }
+  .bg-blob{
+    position:fixed;
+    font-size:34px;
+    opacity:0.35;
+    animation: float 8s ease-in-out infinite;
+    pointer-events:none;
+    user-select:none;
+  }
+  @keyframes float{
+    0%,100%{ transform: translateY(0) rotate(0deg); }
+    50%{ transform: translateY(-18px) rotate(8deg); }
+  }
+  .card{
+    width:100%;
+    max-width: 440px;
+    background: var(--card);
+    border-radius: 32px;
+    box-shadow: var(--shadow);
+    padding: 28px 26px 24px;
+    position:relative;
+    border: 3px solid #ffe6f0;
+  }
+  header{
+    text-align:center;
+    margin-bottom: 18px;
+  }
+  h1{
+    font-family:'Baloo 2', sans-serif;
+    font-size: 30px;
+    margin: 0 0 4px;
+    color: var(--pink-deep);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  h1 .wiggle{
+    display:inline-block;
+    animation: wiggle 2.4s ease-in-out infinite;
+  }
+  @keyframes wiggle{
+    0%,100%{ transform: rotate(0deg); }
+    25%{ transform: rotate(-10deg); }
+    75%{ transform: rotate(10deg); }
+  }
+  .subtitle{
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .counter-wrap{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin: 16px 0 14px;
+  }
+  .counter-track{
+    flex:1;
+    height: 10px;
+    background: #ffeef4;
+    border-radius: 999px;
+    overflow:hidden;
+  }
+  .counter-fill{
+    height:100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--pink), var(--lavender));
+    transition: width 0.4s cubic-bezier(.34,1.56,.64,1);
+    width:0%;
+  }
+  .counter-label{
+    font-family:'Baloo 2', sans-serif;
+    font-weight:700;
+    font-size: 13px;
+    color: var(--pink-deep);
+    white-space:nowrap;
+  }
+  form{
+    display:flex;
+    gap:8px;
+    margin-bottom: 16px;
+  }
+  input[type="text"]{
+    flex:1;
+    padding: 12px 16px;
+    border-radius: 18px;
+    border: 2px solid var(--line);
+    font-family:'Quicksand', sans-serif;
+    font-size: 15px;
+    font-weight:600;
+    color: var(--ink);
+    background: var(--cream);
+    outline:none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  input[type="text"]::placeholder{ color: #c8b8c4; font-weight:500; }
+  input[type="text"]:focus{
+    border-color: var(--pink);
+    box-shadow: 0 0 0 4px rgba(255,159,199,0.2);
+  }
+  input[type="text"]:disabled{
+    opacity: 0.6;
+    cursor:not-allowed;
+  }
+  button.add-btn{
+    width: 46px;
+    height: 46px;
+    flex-shrink:0;
+    border:none;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--pink), var(--pink-deep));
+    color:white;
+    font-size: 22px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow: 0 6px 14px rgba(255,111,165,0.4);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  button.add-btn:hover{ transform: translateY(-2px) scale(1.04); }
+  button.add-btn:active{ transform: translateY(0) scale(0.94); }
+  button.add-btn:disabled{
+    background: #e6d9e2;
+    box-shadow:none;
+    cursor:not-allowed;
+    transform:none;
+  }
+  .full-msg{
+    text-align:center;
+    font-size: 13px;
+    font-weight:600;
+    color: var(--pink-deep);
+    background: #fff0f6;
+    border: 1.5px dashed #ffc3dc;
+    border-radius: 14px;
+    padding: 8px 10px;
+    margin: -6px 0 14px;
+    display:none;
+  }
+  .full-msg.show{ display:block; animation: pop .3s ease; }
+  @keyframes pop{
+    0%{ transform: scale(0.9); opacity:0; }
+    100%{ transform: scale(1); opacity:1; }
+  }
+  ul#list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+    min-height: 40px;
+  }
+  li.task{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    background: var(--cream);
+    border: 2px solid var(--line);
+    border-radius: 18px;
+    padding: 10px 12px;
+    transition: transform .25s ease, background .3s ease, border-color .3s ease;
+    animation: slideIn .35s cubic-bezier(.34,1.56,.64,1);
+    overflow: visible;
+  }
+  @keyframes slideIn{
+    from{ opacity:0; transform: translateY(-10px) scale(0.96); }
+    to{ opacity:1; transform: translateY(0) scale(1); }
+  }
+  li.task.removing{
+    animation: slideOut .28s ease forwards;
+  }
+  @keyframes slideOut{
+    to{ opacity:0; transform: translateX(30px) scale(0.9); height:0; padding-top:0; padding-bottom:0; margin:0; }
+  }
+  li.task.done{
+    background: #f2fbf6;
+    border-color: #cdeedb;
+  }
+  .checkbox{
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2.5px solid var(--pink);
+    flex-shrink:0;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: white;
+    transition: background .25s ease, border-color .25s ease, transform .2s ease;
+    position:relative;
+  }
+  .checkbox:hover{ transform: scale(1.08); }
+  .checkbox svg{
+    width: 15px;
+    height: 15px;
+    opacity:0;
+    transform: scale(0.5);
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  li.task.done .checkbox{
+    background: var(--mint);
+    border-color: #7fd9a6;
+  }
+  li.task.done .checkbox svg{
+    opacity:1;
+    transform: scale(1);
+  }
+  .task-text{
+    flex:1;
+    font-size: 15px;
+    font-weight:600;
+    color: var(--ink);
+    word-break: break-word;
+    transition: color .3s ease;
+  }
+  li.task.done .task-text{
+    color: #8fb8a0;
+    text-decoration: line-through;
+    text-decoration-color: #9fd6b6;
+    text-decoration-thickness: 2px;
+  }
+  .del-btn{
+    border:none;
+    background:transparent;
+    color: #d9b8c8;
+    font-size: 18px;
+    cursor:pointer;
+    padding: 4px 6px;
+    border-radius: 10px;
+    line-height:1;
+    transition: color .2s ease, background .2s ease, transform .2s ease;
+    flex-shrink:0;
+  }
+  .del-btn:hover{
+    color: var(--pink-deep);
+    background: #ffe6f0;
+    transform: scale(1.1) rotate(8deg);
+  }
+  .empty-state{
+    text-align:center;
+    padding: 26px 10px 6px;
+    color: var(--ink-soft);
+  }
+  .empty-state .emoji{
+    font-size: 40px;
+    display:block;
+    margin-bottom: 6px;
+    animation: float 4s ease-in-out infinite;
+  }
+  .empty-state p{
+    margin:0;
+    font-size: 14px;
+    font-weight:600;
+  }
+  /* particle burst on completion */
+  .particle{
+    position:absolute;
+    left: 23px;
+    top: 50%;
+    font-size: 14px;
+    pointer-events:none;
+    will-change: transform, opacity;
+    animation: burst 0.7s ease-out forwards;
+  }
+  @keyframes burst{
+    0%{ opacity:1; transform: translate(-50%,-50%) scale(0.6) translate(0,0); }
+    100%{ opacity:0; transform: translate(-50%,-50%) scale(1.1) translate(var(--dx), var(--dy)); }
+  }
+  .celebrate-overlay{
+    position: fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    z-index: 50;
+  }
+  .celebrate-card{
+    background: white;
+    border-radius: 24px;
+    padding: 22px 30px;
+    box-shadow: 0 20px 50px rgba(255,111,165,0.35);
+    text-align:center;
+    font-family:'Baloo 2', sans-serif;
+    font-size: 20px;
+    color: var(--pink-deep);
+    border: 3px solid #ffdcec;
+    opacity:0;
+    transform: scale(0.7);
+    animation: celebratePop 2.2s ease forwards;
+  }
+  @keyframes celebratePop{
+    0%{ opacity:0; transform: scale(0.6); }
+    15%{ opacity:1; transform: scale(1.08); }
+    25%{ transform: scale(1); }
+    80%{ opacity:1; transform: scale(1); }
+    100%{ opacity:0; transform: scale(0.9); }
+  }
+  .confetti-piece{
+    position: fixed;
+    top: -20px;
+    font-size: 18px;
+    z-index: 49;
+    pointer-events:none;
+    animation: confettiFall linear forwards;
+  }
+  @keyframes confettiFall{
+    to{ transform: translateY(110vh) rotate(360deg); opacity: 0.9; }
+  }
+  footer{
+    text-align:center;
+    margin-top: 18px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  @media (max-width: 480px){
+    .card{ padding: 22px 18px 20px; border-radius: 24px; }
+    h1{ font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+  <span class="bg-blob" style="top:8%; left:6%;">🌸</span>
+  <span class="bg-blob" style="top:15%; right:8%; animation-delay:1s;">✨</span>
+  <span class="bg-blob" style="bottom:10%; left:10%; animation-delay:2s;">🍡</span>
+  <span class="bg-blob" style="bottom:14%; right:7%; animation-delay:1.5s;">🎀</span>
+
+  <div class="card">
+    <header>
+      <h1><span class="wiggle">🐣</span> Cute To-Do <span class="wiggle" style="animation-delay:1.2s;">🎀</span></h1>
+      <p class="subtitle">Ten little tasks, one cozy list</p>
+    </header>
+
+    <div class="counter-wrap">
+      <div class="counter-track"><div class="counter-fill" id="counterFill"></div></div>
+      <span class="counter-label" id="counterLabel">0 / 10</span>
+    </div>
+
+    <form id="taskForm">
+      <input type="text" id="taskInput" placeholder="Add a little task..." maxlength="80" autocomplete="off" />
+      <button type="submit" class="add-btn" id="addBtn" aria-label="Add task">+</button>
+    </form>
+
+    <div class="full-msg" id="fullMsg">Your list is full! 🌷 Finish or remove a task to add another.</div>
+
+    <ul id="list"></ul>
+
+    <div class="empty-state" id="emptyState">
+      <span class="emoji">🐰</span>
+      <p>No tasks yet — add up to 10!</p>
+    </div>
+
+    <footer>made with 💗 for tiny productive days</footer>
+  </div>
+
+<script>
+(function(){
+  const MAX_TASKS = 10;
+  const STORAGE_KEY = 'cute-todo-tasks-v1';
+
+  const listEl = document.getElementById('list');
+  const formEl = document.getElementById('taskForm');
+  const inputEl = document.getElementById('taskInput');
+  const addBtn = document.getElementById('addBtn');
+  const fullMsg = document.getElementById('fullMsg');
+  const emptyState = document.getElementById('emptyState');
+  const counterFill = document.getElementById('counterFill');
+  const counterLabel = document.getElementById('counterLabel');
+
+  let tasks = loadTasks();
+
+  function loadTasks(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return [];
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)) return parsed.slice(0, MAX_TASKS);
+      return [];
+    }catch(e){
+      return [];
+    }
+  }
+
+  function saveTasks(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }catch(e){ /* storage unavailable, ignore */ }
+  }
+
+  function uid(){
+    return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+
+  function render(){
+    listEl.innerHTML = '';
+    if(tasks.length === 0){
+      emptyState.style.display = 'block';
+    } else {
+      emptyState.style.display = 'none';
+      tasks.forEach(task => listEl.appendChild(buildTaskEl(task)));
+    }
+
+    const atLimit = tasks.length >= MAX_TASKS;
+    inputEl.disabled = atLimit;
+    addBtn.disabled = atLimit;
+    fullMsg.classList.toggle('show', atLimit);
+
+    counterFill.style.width = ((tasks.length / MAX_TASKS) * 100) + '%';
+    counterLabel.textContent = tasks.length + ' / ' + MAX_TASKS;
+  }
+
+  function buildTaskEl(task){
+    const li = document.createElement('li');
+    li.className = 'task' + (task.done ? ' done' : '');
+    li.dataset.id = task.id;
+
+    const checkbox = document.createElement('button');
+    checkbox.type = 'button';
+    checkbox.className = 'checkbox';
+    checkbox.setAttribute('aria-label', task.done ? 'Mark as not done' : 'Mark as done');
+    checkbox.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    checkbox.addEventListener('click', () => toggleTask(task.id, checkbox, li));
+
+    const text = document.createElement('span');
+    text.className = 'task-text';
+    text.textContent = task.text;
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del-btn';
+    del.setAttribute('aria-label', 'Delete task');
+    del.textContent = '✕';
+    del.addEventListener('click', () => removeTask(task.id, li));
+
+    li.appendChild(checkbox);
+    li.appendChild(text);
+    li.appendChild(del);
+    return li;
+  }
+
+  function toggleTask(id, checkboxEl, liEl){
+    const task = tasks.find(t => t.id === id);
+    if(!task) return;
+    task.done = !task.done;
+    saveTasks();
+
+    if(task.done){
+      liEl.classList.add('done');
+      spawnParticles(checkboxEl);
+      liEl.style.transform = 'scale(1.03)';
+      setTimeout(() => { liEl.style.transform = ''; }, 220);
+      if(tasks.length > 0 && tasks.every(t => t.done)){
+        celebrateAll();
+      }
+    } else {
+      liEl.classList.remove('done');
+    }
+  }
+
+  function removeTask(id, liEl){
+    liEl.classList.add('removing');
+    setTimeout(() => {
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      render();
+    }, 260);
+  }
+
+  const PARTICLE_EMOJI = ['✨','💗','⭐','🌸','💫'];
+  function spawnParticles(anchorEl){
+    const count = 8;
+    for(let i = 0; i < count; i++){
+      const p = document.createElement('span');
+      p.className = 'particle';
+      p.textContent = PARTICLE_EMOJI[i % PARTICLE_EMOJI.length];
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+      const dist = 30 + Math.random() * 18;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      p.style.setProperty('--dx', dx + 'px');
+      p.style.setProperty('--dy', dy + 'px');
+      anchorEl.appendChild(p);
+      setTimeout(() => p.remove(), 750);
+    }
+  }
+
+  function celebrateAll(){
+    const overlay = document.createElement('div');
+    overlay.className = 'celebrate-overlay';
+    overlay.innerHTML = '<div class="celebrate-card">🎉 All done! You\'re amazing! 🎉</div>';
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 2200);
+
+    const confettiEmoji = ['🎉','✨','🌸','💗','⭐','🎀'];
+    for(let i = 0; i < 26; i++){
+      const c = document.createElement('span');
+      c.className = 'confetti-piece';
+      c.textContent = confettiEmoji[Math.floor(Math.random() * confettiEmoji.length)];
+      c.style.left = Math.random() * 100 + 'vw';
+      c.style.animationDuration = (1.6 + Math.random() * 1.2) + 's';
+      c.style.fontSize = (14 + Math.random() * 10) + 'px';
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 3000);
+    }
+  }
+
+  formEl.addEventListener('submit', function(e){
+    e.preventDefault();
+    const value = inputEl.value.trim();
+    if(!value) return;
+    if(tasks.length >= MAX_TASKS) return;
+
+    tasks.push({ id: uid(), text: value, done: false });
+    saveTasks();
+    inputEl.value = '';
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
