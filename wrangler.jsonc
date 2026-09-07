@@ -2,8 +2,26 @@
   // Must match the Worker's name in the Cloudflare dashboard exactly,
   // or `wrangler deploy` targets a different Worker and the Git link breaks.
   "name": "todolist-app",
+  "main": "src/index.js",
   "compatibility_date": "2025-01-01",
+
   "assets": {
-    "directory": "./public"
-  }
+    "directory": "./public",
+    // Named binding so the Worker can hand non-/api/ requests to the
+    // static files. Assets are matched before the Worker runs, so /
+    // serves index.html directly and only /api/* reaches the code.
+    "binding": "ASSETS"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "todolist-db",
+      // Replace with the id printed by:  npx wrangler d1 create todolist-db
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ]
+
+  // The password verifier is a secret, not a var — never put it here:
+  //   npx wrangler secret put APP_PASSWORD_HASH
 }

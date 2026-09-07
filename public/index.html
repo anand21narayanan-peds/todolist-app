@@ -412,6 +412,69 @@
     font-size: 11px; color: var(--ink-faint); text-align: center; margin: 0;
   }
 
+  /* ---------- sign-in gate ---------- */
+  .gate{
+    position: fixed; inset: 0; z-index: 80;
+    background: var(--ground);
+    display: grid; place-items: center; padding: 24px;
+  }
+  .gate-card{
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 22px; box-shadow: var(--shadow-lift);
+    padding: 32px 30px; width: 100%; max-width: 380px;
+    display: flex; flex-direction: column; gap: 5px; text-align: center;
+  }
+  .gate-emo{ font-size: 38px; line-height: 1; }
+  .gate-card h2{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-size: 23px; font-weight: 800; margin: 0; color: var(--pink);
+  }
+  .gate-card p{ margin: 0 0 6px; color: var(--ink-soft); font-size: 14px; }
+  .gate-card form{ display: flex; flex-direction: column; gap: 9px; }
+  .gate-card input{
+    font-family: 'Quicksand', system-ui, sans-serif;
+    font-size: 15px; font-weight: 600; color: var(--ink);
+    background: var(--card-sunk); border: 1.5px solid var(--rule);
+    border-radius: 12px; padding: 11px 14px; outline: none; text-align: center;
+    transition: border-color .2s ease;
+  }
+  .gate-card input:focus{ border-color: var(--pink); }
+  .gate-card .btn{ padding: 11px 18px; font-size: 15px; }
+  .gate-err{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px; color: var(--pink); min-height: 16px; margin: 0;
+  }
+
+  /* ---------- sync status ---------- */
+  .topbar{ display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .sync{
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; color: var(--ink-soft);
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 999px; padding: 5px 12px; white-space: nowrap;
+  }
+  .sync .dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--mint); flex: none; }
+  .sync.saving .dot{ background: var(--peach); animation: pulse 1s ease-in-out infinite; }
+  .sync.error{ border-color: var(--pink); color: var(--pink); }
+  .sync.error .dot{ background: var(--pink); }
+  @keyframes pulse{ 0%,100%{ opacity: 1; } 50%{ opacity: .3; } }
+  .linkish{
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; color: var(--ink-faint); text-decoration: underline;
+  }
+  .linkish:hover{ color: var(--pink); }
+
+  /* ---------- one-time import ---------- */
+  .import{
+    background: var(--lav-wash); border: 1.5px solid color-mix(in srgb, var(--lav) 35%, var(--rule));
+    border-radius: 16px; padding: 16px 18px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .import p{ margin: 0; flex: 1 1 260px; font-size: 14px; color: var(--ink); }
+  .import p b{ font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif; }
+
   @media (max-width: 700px){
     .tabs{ grid-template-columns: repeat(2, 1fr); }
     .goal{ flex-direction: column; align-items: flex-start; gap: 15px; }
@@ -424,12 +487,36 @@
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <header class="masthead">
-    <h1><span class="wig">🐣</span> Cute To-Do</h1>
-    <p class="rule-line">4 goals · 4 systems each · 4 tasks each</p>
-  </header>
+<div class="gate" id="gate" hidden>
+  <div class="gate-card">
+    <span class="gate-emo">🔐</span>
+    <h2>Cute To-Do</h2>
+    <p>Sign in to reach your board from any device.</p>
+    <form id="loginForm">
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password"
+             aria-label="Password" required />
+      <button class="btn" type="submit" id="loginBtn">Sign in</button>
+    </form>
+    <p class="gate-err" id="loginErr" role="alert"></p>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
+
+  <div class="topbar">
+    <header class="masthead">
+      <h1><span class="wig">🐣</span> Cute To-Do</h1>
+      <p class="rule-line">4 goals · 4 systems each · 4 tasks each</p>
+    </header>
+    <span class="sync" id="sync"><span class="dot"></span><span id="syncText">Synced</span></span>
+  </div>
+
+  <div class="import" id="importBanner" hidden>
+    <p><b>Found a board saved on this device.</b> Bring it into your account so it shows up everywhere?</p>
+    <button class="btn" id="importBtn" type="button">Import it</button>
+    <button class="linkish" id="importSkip" type="button">No thanks</button>
+  </div>
 
   <section class="goalbar">
     <div class="goalbar-top">
@@ -474,7 +561,10 @@
     <button class="btn" id="firstGoal" type="button">+ Add your first goal</button>
   </div>
 
-  <p class="foot">Saved in this browser only 🌸</p>
+  <p class="foot">
+    Synced to your account 🌸 &nbsp;·&nbsp;
+    <button class="linkish" id="signOut" type="button">Sign out</button>
+  </p>
 </div>
 
 <script>
@@ -483,62 +573,78 @@
 
   var MAX_GOALS = 4, MAX_SYSTEMS = 4, MAX_TASKS = 4;
   var RING = 220, TABRING = 69;
-  var KEY = 'cute-systems-todo-v1';
+  var LEGACY_KEY = 'cute-systems-todo-v1';
 
-  var uid = 0;
-  function nid(){ return 'n' + (Date.now().toString(36)) + (++uid).toString(36); }
-
+  /* Server-owned state. `open` is a Set of expanded system ids. */
   var goals = [];
   var sel = 0;
+  var open = new Set();
+  var booted = false;
 
-  /* ---------- storage ---------- */
-  function load(){
-    try{
-      var raw = localStorage.getItem(KEY);
-      if (!raw) return null;
-      var d = JSON.parse(raw);
-      if (!d || !Array.isArray(d.goals)) return null;
-      // rebuild defensively so a hand-edited or partial payload cannot break rendering
-      return {
-        goals: d.goals.slice(0, MAX_GOALS).map(function(g){
-          return {
-            id: g && g.id ? String(g.id) : nid(),
-            name: g && g.name ? String(g.name) : 'Untitled goal',
-            systems: (g && Array.isArray(g.systems) ? g.systems : []).slice(0, MAX_SYSTEMS).map(function(s){
-              return {
-                id: s && s.id ? String(s.id) : nid(),
-                name: s && s.name ? String(s.name) : 'Untitled system',
-                open: !!(s && s.open),
-                tasks: (s && Array.isArray(s.tasks) ? s.tasks : []).slice(0, MAX_TASKS).map(function(t){
-                  return {
-                    id: t && t.id ? String(t.id) : nid(),
-                    title: t && t.title ? String(t.title) : '',
-                    dod: t && t.dod ? String(t.dod) : '',
-                    done: !!(t && t.done)
-                  };
-                }).filter(function(t){ return t.title; })
-              };
-            })
-          };
-        }),
-        sel: typeof d.sel === 'number' ? d.sel : 0
-      };
-    }catch(e){ return null; }
+  var el = function(id){ return document.getElementById(id); };
+  var tabsEl = el('tabs'), systemsEl = el('systems'), goalCard = el('goalCard');
+  var ringArc = el('ringArc'), ringPct = el('ringPct');
+  var addSysBtn = el('addSys'), addSysRow = el('addSysRow');
+  var sysCapEl = el('sysCap'), goalCapEl = el('goalCap');
+  var noGoals = el('noGoals'), goalTitleEl = el('goalTitle');
+  var gate = el('gate'), app = el('app');
+  var syncEl = el('sync'), syncText = el('syncText');
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ------------------------------------------------------------ transport */
+
+  var inFlight = 0;
+  function setSync(kind, text){
+    syncEl.className = 'sync' + (kind ? ' ' + kind : '');
+    syncText.textContent = text;
   }
 
-  function save(){
-    try{
-      localStorage.setItem(KEY, JSON.stringify({ goals: goals, sel: sel }));
-    }catch(e){ /* private mode or storage full — the board still works this session */ }
+  function api(path, method, body){
+    inFlight++;
+    if (inFlight === 1) setSync('saving', 'Saving…');
+    var opts = { method: method || 'GET', credentials: 'same-origin', headers: {} };
+    if (body !== undefined){
+      opts.headers['content-type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(path, opts).then(function(res){
+      return res.json().catch(function(){ return {}; }).then(function(data){
+        if (res.status === 401 && path !== '/api/login'){
+          showGate();
+          throw new Error('Signed out');
+        }
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        return data;
+      });
+    }).finally(function(){
+      inFlight--;
+      if (inFlight === 0) setSync('', 'Synced');
+    });
   }
 
-  /* ---------- derived ---------- */
-  function sysDone(s){
-    return s.tasks.length > 0 && s.tasks.every(function(t){ return t.done; });
+  /** Any mutation returns the whole board; adopt it and repaint. */
+  function adopt(data, keepDom){
+    if (!data || !Array.isArray(data.goals)) return;
+    goals = data.goals;
+    if (data.ui){
+      if (Number.isInteger(data.ui.sel)) sel = data.ui.sel;
+      if (Array.isArray(data.ui.open)) open = new Set(data.ui.open);
+    }
+    if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
+    if (!keepDom) render();
   }
-  function goalDone(g){
-    return g.systems.length > 0 && g.systems.every(sysDone);
+
+  function fail(err){
+    if (!err || err.message === 'Signed out') return;
+    setSync('error', "Couldn't save");
+    say(err.message || 'Something went wrong.');
+    setTimeout(function(){ if (inFlight === 0) setSync('', 'Synced'); }, 3200);
   }
+
+  /* --------------------------------------------------------------- derived */
+
+  function sysDone(s){ return s.tasks.length > 0 && s.tasks.every(function(t){ return t.done; }); }
+  function goalDone(g){ return g.systems.length > 0 && g.systems.every(sysDone); }
   function tally(g){
     var all = 0, done = 0;
     g.systems.forEach(function(s){
@@ -554,15 +660,18 @@
     return ['todo', 'Not started'];
   }
 
-  var el = function(id){ return document.getElementById(id); };
-  var tabsEl = el('tabs'), systemsEl = el('systems'), goalCard = el('goalCard');
-  var ringArc = el('ringArc'), ringPct = el('ringPct');
-  var addSysBtn = el('addSys'), addSysRow = el('addSysRow');
-  var sysCapEl = el('sysCap'), goalCapEl = el('goalCap');
-  var noGoals = el('noGoals'), goalTitleEl = el('goalTitle');
-  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* ------------------------------------------------------- UI-state saving */
 
-  /* ---------- inline rename ---------- */
+  var uiTimer = null;
+  function saveUi(){
+    clearTimeout(uiTimer);
+    uiTimer = setTimeout(function(){
+      api('/api/ui', 'PUT', { sel: sel, open: Array.from(open) }).catch(function(){});
+    }, 400);
+  }
+
+  /* ------------------------------------------------------- inline renaming */
+
   function startEdit(node, current, commit, placeholder){
     if (node.dataset.editing === '1') return;
     node.dataset.editing = '1';
@@ -583,12 +692,12 @@
       settled = true;
       node.dataset.editing = '0';
       var v = input.value.trim();
-      if (keep && v) commit(v);
-      render();
+      if (keep && v && v !== current) commit(v);
+      else render();
     }
-    // The input lives inside a .nm node that has its own Enter/Space handler.
-    // Without this, every keystroke bubbles up: Space gets preventDefault()ed
-    // (untypeable spaces) and Enter reopens the editor it just closed.
+    // The input sits inside a .nm node that handles Enter/Space itself.
+    // Without stopPropagation, Space is preventDefault()ed (untypeable) and
+    // Enter reopens the editor it just closed.
     input.addEventListener('keydown', function(e){
       e.stopPropagation();
       if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
@@ -598,7 +707,8 @@
     input.addEventListener('click', function(e){ e.stopPropagation(); });
   }
 
-  /* ---------- render ---------- */
+  /* ---------------------------------------------------------------- render */
+
   function renderTabs(){
     tabsEl.textContent = '';
     goals.forEach(function(g, i){
@@ -632,7 +742,7 @@
 
       b.appendChild(ring);
       b.appendChild(txt);
-      b.addEventListener('click', function(){ sel = i; save(); render(); });
+      b.addEventListener('click', function(){ sel = i; saveUi(); render(); });
       tabsEl.appendChild(b);
     });
 
@@ -680,9 +790,7 @@
         '<p>Break this goal into the areas it is really made of. Four at most — if you need a fifth, two of them are probably the same thing.</p>';
       systemsEl.appendChild(e);
     } else {
-      g.systems.forEach(function(sys, i){
-        systemsEl.appendChild(buildSystem(g, sys, i));
-      });
+      g.systems.forEach(function(sys, i){ systemsEl.appendChild(buildSystem(g, sys, i)); });
     }
 
     addSysBtn.disabled = g.systems.length >= MAX_SYSTEMS;
@@ -694,16 +802,16 @@
     var st = statusOf(sys), cls = st[0], label = st[1];
     var dc = sys.tasks.filter(function(t){ return t.done; }).length;
     var pct = sys.tasks.length ? Math.round(dc / sys.tasks.length * 100) : 0;
+    var isOpen = open.has(sys.id);
 
     var card = document.createElement('article');
-    card.className = 'sys' + (sys.open ? ' open' : '') + (cls === 'done' ? ' is-done' : '');
+    card.className = 'sys' + (isOpen ? ' open' : '') + (cls === 'done' ? ' is-done' : '');
 
     var seal = document.createElement('div');
     seal.className = 'seal';
     seal.textContent = 'SYSTEM COMPLETE';
     card.appendChild(seal);
 
-    /* head */
     var head = document.createElement('div');
     head.className = 'sys-head';
 
@@ -722,15 +830,14 @@
     nm.setAttribute('role', 'button');
     nm.title = 'Click to rename';
     nm.textContent = sys.name;
-    nm.addEventListener('click', function(e){
-      e.stopPropagation();
-      startEdit(nm, sys.name, function(v){ sys.name = v; save(); });
-    });
+    function renameSys(){
+      startEdit(nm, sys.name, function(v){
+        api('/api/systems/' + sys.id, 'PATCH', { name: v }).then(adopt).catch(fail);
+      });
+    }
+    nm.addEventListener('click', function(e){ e.stopPropagation(); renameSys(); });
     nm.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' || e.key === ' '){
-        e.preventDefault(); e.stopPropagation();
-        startEdit(nm, sys.name, function(v){ sys.name = v; save(); });
-      }
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); renameSys(); }
     });
     var chip = document.createElement('span');
     chip.className = 'chip ' + cls;
@@ -753,12 +860,12 @@
     count.className = 'mono';
     count.textContent = dc + '/' + sys.tasks.length;
 
-    var toggle = document.createElement('button');
-    toggle.className = 'icon-btn';
-    toggle.type = 'button';
-    toggle.setAttribute('aria-expanded', String(!!sys.open));
-    toggle.setAttribute('aria-label', (sys.open ? 'Collapse ' : 'Expand ') + sys.name);
-    toggle.innerHTML = '<svg class="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" ' +
+    var toggleBtn = document.createElement('button');
+    toggleBtn.className = 'icon-btn';
+    toggleBtn.type = 'button';
+    toggleBtn.setAttribute('aria-expanded', String(isOpen));
+    toggleBtn.setAttribute('aria-label', (isOpen ? 'Collapse ' : 'Expand ') + sys.name);
+    toggleBtn.innerHTML = '<svg class="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" ' +
       'stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" ' +
       'aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
 
@@ -770,32 +877,31 @@
     killSys.textContent = '×';
     killSys.addEventListener('click', function(e){
       e.stopPropagation();
-      goal.systems = goal.systems.filter(function(s){ return s.id !== sys.id; });
-      save(); render();
+      open.delete(sys.id);
+      api('/api/systems/' + sys.id, 'DELETE').then(adopt).catch(fail);
     });
 
     tools.appendChild(count);
-    tools.appendChild(toggle);
+    tools.appendChild(toggleBtn);
     tools.appendChild(killSys);
 
     head.appendChild(code);
     head.appendChild(main);
     head.appendChild(tools);
     head.addEventListener('click', function(){
-      sys.open = !sys.open; save(); render();
+      if (open.has(sys.id)) open.delete(sys.id); else open.add(sys.id);
+      saveUi();
+      render();
     });
     card.appendChild(head);
 
-    /* body */
     var body = document.createElement('div');
     body.className = 'sys-body';
 
     if (sys.tasks.length){
       var list = document.createElement('ul');
       list.className = 'tasks';
-      sys.tasks.forEach(function(task){
-        list.appendChild(buildTask(goal, sys, task, card));
-      });
+      sys.tasks.forEach(function(task){ list.appendChild(buildTask(goal, sys, task, card)); });
       body.appendChild(list);
     } else {
       var te = document.createElement('div');
@@ -821,15 +927,16 @@
       btn.className = 'btn';
       btn.textContent = 'Add';
 
-      function submit(){
+      var submit = function(){
         var v = tIn.value.trim();
-        if (!v || sys.tasks.length >= MAX_TASKS) return;
-        sys.tasks.push({ id: nid(), title: v, dod: dIn.value.trim(), done: false });
-        sys.open = true;
-        save(); render();
-      }
+        if (!v) return;
+        btn.disabled = true;
+        open.add(sys.id);
+        api('/api/systems/' + sys.id + '/tasks', 'POST', { title: v, dod: dIn.value.trim() })
+          .then(adopt).catch(fail);
+      };
       btn.addEventListener('click', submit);
-      function onKey(e){ if (e.key === 'Enter'){ e.preventDefault(); submit(); } }
+      var onKey = function(e){ if (e.key === 'Enter'){ e.preventDefault(); submit(); } };
       tIn.addEventListener('keydown', onKey);
       dIn.addEventListener('keydown', onKey);
 
@@ -860,7 +967,7 @@
     box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" ' +
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<polyline points="20 6 9 17 4 12"></polyline></svg>';
-    box.addEventListener('click', function(){ toggle(goal, sys, task, li, box, card); });
+    box.addEventListener('click', function(){ toggleTask(goal, sys, task, li, box, card); });
 
     var text = document.createElement('div');
     text.className = 'task-text';
@@ -874,7 +981,9 @@
     tnm.title = 'Click to edit';
     tnm.textContent = task.title;
     function editTitle(){
-      startEdit(tnm, task.title, function(v){ task.title = v; save(); });
+      startEdit(tnm, task.title, function(v){
+        api('/api/tasks/' + task.id, 'PATCH', { title: v }).then(adopt).catch(fail);
+      });
     }
     tnm.addEventListener('click', editTitle);
     tnm.addEventListener('keydown', function(e){
@@ -896,7 +1005,9 @@
       dnm.textContent = '+ add a done-when';
     }
     function editDod(){
-      startEdit(dnm, task.dod, function(v){ task.dod = v; save(); }, 'done when…');
+      startEdit(dnm, task.dod, function(v){
+        api('/api/tasks/' + task.id, 'PATCH', { dod: v }).then(adopt).catch(fail);
+      }, 'done when…');
     }
     dnm.addEventListener('click', editDod);
     dnm.addEventListener('keydown', function(e){
@@ -914,8 +1025,7 @@
     kill.title = 'Delete task';
     kill.textContent = '×';
     kill.addEventListener('click', function(){
-      sys.tasks = sys.tasks.filter(function(t){ return t.id !== task.id; });
-      save(); render();
+      api('/api/tasks/' + task.id, 'DELETE').then(adopt).catch(fail);
     });
 
     li.appendChild(box);
@@ -924,19 +1034,43 @@
     return li;
   }
 
-  /* ---------- interactions ---------- */
-  function toggle(goal, sys, task, li, box, card){
+  /* ---------------------------------------------------------- interactions */
+
+  function toggleTask(goal, sys, task, li, box, card){
     var sysWas = sysDone(sys);
     var goalWas = goalDone(goal);
     var allWas = goals.length > 0 && goals.every(goalDone);
+    var prev = task.done;
 
-    task.done = !task.done;
+    // Optimistic: the animation has to fire on the click, not a round trip
+    // later, and a full re-render would destroy the card mid-animation.
+    task.done = !prev;
     li.classList.toggle('done', task.done);
     box.setAttribute('aria-pressed', String(task.done));
     box.setAttribute('aria-label', (task.done ? 'Untick: ' : 'Tick: ') + task.title);
     if (task.done) burst(box);
-    save();
+    paintSystem(sys, card);
+    updateSummaries(goal);
 
+    if (!sysWas && sysDone(sys)){
+      card.classList.add('sealing');
+      setTimeout(function(){ card.classList.remove('sealing'); }, 1300);
+    }
+    if (!goalWas && goalDone(goal)){
+      var allNow = goals.length > 0 && goals.every(goalDone);
+      setTimeout(function(){ celebrate(allNow && !allWas ? 'finale' : 'goal', goal.name); }, 420);
+    }
+
+    api('/api/tasks/' + task.id, 'PATCH', { done: task.done })
+      .then(function(data){ adopt(data, true); })   // keep the DOM we just animated
+      .catch(function(err){
+        task.done = prev;                            // put it back
+        render();
+        fail(err);
+      });
+  }
+
+  function paintSystem(sys, card){
     var st = statusOf(sys);
     var dc = sys.tasks.filter(function(t){ return t.done; }).length;
     var chip = card.querySelector('.chip');
@@ -946,19 +1080,6 @@
       (sys.tasks.length ? dc / sys.tasks.length * 100 : 0) + '%';
     card.querySelector('.sys-tools .mono').textContent = dc + '/' + sys.tasks.length;
     card.classList.toggle('is-done', st[0] === 'done');
-
-    updateSummaries(goal);
-
-    if (!sysWas && sysDone(sys)){
-      card.classList.add('sealing');
-      setTimeout(function(){ card.classList.remove('sealing'); }, 1300);
-    }
-    if (!goalWas && goalDone(goal)){
-      var allNow = goals.length > 0 && goals.every(goalDone);
-      setTimeout(function(){
-        celebrate(allNow && !allWas ? 'finale' : 'goal', goal.name);
-      }, 420);
-    }
   }
 
   function updateSummaries(goal){
@@ -972,6 +1093,19 @@
     goalCard.classList.toggle('complete', goalDone(goal));
     renderTabs();
   }
+
+  function addGoal(){
+    if (goals.length >= MAX_GOALS) return;
+    api('/api/goals', 'POST', { name: 'New goal' }).then(function(data){
+      adopt(data);
+      sel = goals.length - 1;
+      render();
+      saveUi();
+      goalTitleEl.click();
+    }).catch(fail);
+  }
+
+  /* ------------------------------------------------------------- animation */
 
   var SPARKS = ['✨','💗','⭐','🌸','💫'];
   function burst(anchor){
@@ -989,20 +1123,20 @@
     }
   }
 
-  function celebrate(kind, name){
-    var finale = kind === 'finale';
+  function say(message, kind){
     var t = document.createElement('div');
-    t.className = 'toast' + (finale ? ' finale' : '');
-    t.textContent = finale
-      ? '🏆 Every goal complete — the whole board is done!'
-      : '🎉 ' + name + ' — every system complete!';
+    t.className = 'toast' + (kind ? ' ' + kind : '');
+    t.textContent = message;
     document.body.appendChild(t);
     setTimeout(function(){ t.remove(); }, 2700);
+  }
 
+  function celebrate(kind, name){
+    var finale = kind === 'finale';
+    say(finale ? '🏆 Every goal complete — the whole board is done!'
+               : '🎉 ' + name + ' — every system complete!', finale ? 'finale' : '');
     if (reduced) return;
-    var bits = finale
-      ? ['🏆','🎉','✨','🌸','💗','⭐','🎀','💫']
-      : ['🎉','✨','🌸','💗','⭐','🎀'];
+    var bits = finale ? ['🏆','🎉','✨','🌸','💗','⭐','🎀','💫'] : ['🎉','✨','🌸','💗','⭐','🎀'];
     var n = finale ? 60 : 30;
     for (var i = 0; i < n; i++){
       var c = document.createElement('span');
@@ -1017,56 +1151,144 @@
     }
   }
 
-  function addGoal(){
-    if (goals.length >= MAX_GOALS) return;
-    goals.push({ id: nid(), name: 'New goal', systems: [] });
-    sel = goals.length - 1;
-    save(); render();
-    goalTitleEl.click();
-  }
+  /* ------------------------------------------------------------ wire it up */
 
   addSysBtn.addEventListener('click', function(){
     var g = goals[sel];
     if (!g || g.systems.length >= MAX_SYSTEMS) return;
-    g.systems.push({ id: nid(), name: 'New system', open: true, tasks: [] });
-    save(); render();
-    var first = systemsEl.querySelector('.sys .nm');
-    if (first) first.click();
+    api('/api/goals/' + g.id + '/systems', 'POST', { name: 'New system' }).then(function(data){
+      var before = new Set();
+      (goals[sel] ? goals[sel].systems : []).forEach(function(s){ before.add(s.id); });
+      adopt(data);
+      var fresh = (goals[sel] || { systems: [] }).systems.filter(function(s){ return !before.has(s.id); })[0];
+      if (fresh){ open.add(fresh.id); saveUi(); render(); }
+      var node = systemsEl.querySelector('.sys .nm');
+      if (node) node.click();
+    }).catch(fail);
   });
 
   el('firstGoal').addEventListener('click', addGoal);
 
   el('goalKill').addEventListener('click', function(){
-    if (!goals.length) return;
-    goals.splice(sel, 1);
-    if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
-    save(); render();
+    var g = goals[sel];
+    if (!g) return;
+    api('/api/goals/' + g.id, 'DELETE').then(function(data){
+      adopt(data);
+      if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
+      saveUi();
+      render();
+    }).catch(fail);
   });
 
   goalTitleEl.addEventListener('click', function(){
     var g = goals[sel];
     if (!g) return;
-    startEdit(goalTitleEl, g.name, function(v){ g.name = v; save(); });
+    startEdit(goalTitleEl, g.name, function(v){
+      api('/api/goals/' + g.id, 'PATCH', { name: v }).then(adopt).catch(fail);
+    });
   });
   goalTitleEl.addEventListener('keydown', function(e){
-    if (e.key === 'Enter' || e.key === ' '){
-      e.preventDefault();
-      goalTitleEl.click();
-    }
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); goalTitleEl.click(); }
+  });
+
+  el('signOut').addEventListener('click', function(){
+    api('/api/logout', 'POST').then(showGate).catch(showGate);
   });
 
   function render(){ renderTabs(); renderGoal(); }
 
-  /* ---------- boot ---------- */
-  var saved = load();
-  if (saved && saved.goals.length){
-    goals = saved.goals;
-    sel = Math.min(Math.max(0, saved.sel), goals.length - 1);
-  } else {
-    goals = [];
-    sel = 0;
+  /* ------------------------------------------------------------------ auth */
+
+  function showGate(){
+    gate.hidden = false;
+    app.hidden = true;
+    goals = []; sel = 0; open = new Set();
+    setTimeout(function(){ el('password').focus(); }, 30);
   }
-  render();
+
+  function showApp(){
+    gate.hidden = true;
+    app.hidden = false;
+  }
+
+  el('loginForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var pw = el('password').value;
+    var btn = el('loginBtn');
+    var err = el('loginErr');
+    err.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    api('/api/login', 'POST', { password: pw }).then(function(){
+      el('password').value = '';
+      showApp();
+      return loadBoard();
+    }).catch(function(e2){
+      err.textContent = e2.message || 'That did not work.';
+    }).finally(function(){
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    });
+  });
+
+  /* --------------------------------------- migrating a device-only board */
+
+  function legacyBoard(){
+    try{
+      var raw = localStorage.getItem(LEGACY_KEY);
+      if (!raw) return null;
+      var d = JSON.parse(raw);
+      if (d && Array.isArray(d.goals) && d.goals.length) return d;
+    }catch(e){}
+    return null;
+  }
+
+  function offerImport(){
+    var legacy = legacyBoard();
+    if (!legacy || goals.length) return;
+    var banner = el('importBanner');
+    banner.hidden = false;
+    el('importBtn').onclick = function(){
+      el('importBtn').disabled = true;
+      api('/api/import', 'POST', { goals: legacy.goals }).then(function(data){
+        adopt(data);
+        banner.hidden = true;
+        try{ localStorage.removeItem(LEGACY_KEY); }catch(e){}
+        say('Imported — it is on all your devices now 🌸');
+      }).catch(function(e2){
+        el('importBtn').disabled = false;
+        fail(e2);
+      });
+    };
+    el('importSkip').onclick = function(){ banner.hidden = true; };
+  }
+
+  /* ------------------------------------------------------------------ boot */
+
+  function loadBoard(){
+    return api('/api/board').then(function(data){
+      adopt(data);
+      offerImport();
+      booted = true;
+    }).catch(function(e){
+      if (e && e.message !== 'Signed out') fail(e);
+    });
+  }
+
+  // Another device may have changed the board while this tab sat idle.
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && booted && !app.hidden && inFlight === 0) {
+      api('/api/board').then(function(d){ adopt(d); }).catch(function(){});
+    }
+  });
+
+  api('/api/session').then(function(d){
+    if (d.authed){ showApp(); loadBoard(); }
+    else showGate();
+  }).catch(function(){
+    showGate();
+    el('loginErr').textContent = 'Cannot reach the server.';
+  });
 })();
 </script>
 </body>
