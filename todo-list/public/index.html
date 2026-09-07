@@ -4,563 +4,1068 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Cute To-Do</title>
-<meta name="description" content="A cute 10-task to-do list with satisfying complete animations." />
+<meta name="description" content="A cute to-do list built as a work breakdown: four goals, four systems each, four tasks each." />
+<meta name="color-scheme" content="light dark" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌸</text></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Quicksand:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
   :root{
-    --pink: #ff9fc7;
-    --pink-deep: #ff6fa5;
-    --lavender: #c9b6ff;
-    --mint: #a6e3c4;
-    --peach: #ffd9a0;
-    --cream: #fff8f2;
-    --card: #ffffff;
-    --ink: #5c4a5e;
-    --ink-soft: #9c8aa0;
-    --line: #f1e3ea;
-    --shadow: 0 12px 30px rgba(255, 141, 179, 0.25);
+    --ground:      #fdf7fa;
+    --ground-tint: #f7edf4;
+    --card:        #ffffff;
+    --card-sunk:   #fbf4f8;
+    --ink:         #54415c;
+    --ink-soft:    #8d7897;
+    --ink-faint:   #b3a2bb;
+    --rule:        #f0e0ea;
+    --rule-strong: #e2cdda;
+    --pink:        #ff6fa5;
+    --pink-wash:   #ffeaf3;
+    --lav:         #8f72f0;
+    --lav-wash:    #ede7ff;
+    --mint:        #35a878;
+    --mint-wash:   #e2f7ee;
+    --peach:       #e08334;
+    --peach-wash:  #fff0e0;
+    --shadow:      0 10px 28px rgba(190,120,160,.14);
+    --shadow-lift: 0 16px 40px rgba(190,120,160,.22);
   }
-  *{ box-sizing:border-box; }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:      #1c1622;
+      --ground-tint: #251d2d;
+      --card:        #2a2133;
+      --card-sunk:   #221a2a;
+      --ink:         #f3e9f6;
+      --ink-soft:    #b6a4c0;
+      --ink-faint:   #7d6c88;
+      --rule:        #3a2f45;
+      --rule-strong: #4c3d59;
+      --pink:        #ff8ab8;
+      --pink-wash:   #3d2334;
+      --lav:         #b49bff;
+      --lav-wash:    #2f2748;
+      --mint:        #5fd6a4;
+      --mint-wash:   #1f3a31;
+      --peach:       #ffb474;
+      --peach-wash:  #3b2c1c;
+      --shadow:      0 10px 28px rgba(0,0,0,.4);
+      --shadow-lift: 0 16px 40px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:      #1c1622;
+    --ground-tint: #251d2d;
+    --card:        #2a2133;
+    --card-sunk:   #221a2a;
+    --ink:         #f3e9f6;
+    --ink-soft:    #b6a4c0;
+    --ink-faint:   #7d6c88;
+    --rule:        #3a2f45;
+    --rule-strong: #4c3d59;
+    --pink:        #ff8ab8;
+    --pink-wash:   #3d2334;
+    --lav:         #b49bff;
+    --lav-wash:    #2f2748;
+    --mint:        #5fd6a4;
+    --mint-wash:   #1f3a31;
+    --peach:       #ffb474;
+    --peach-wash:  #3b2c1c;
+    --shadow:      0 10px 28px rgba(0,0,0,.4);
+    --shadow-lift: 0 16px 40px rgba(0,0,0,.5);
+  }
+
+  *{ box-sizing: border-box; }
+  /* .goal, .add-sys-row and .empty all set display, which outranks the UA
+     stylesheet's [hidden]{display:none} — without this they never hide. */
+  [hidden]{ display: none !important; }
+  html{ -webkit-text-size-adjust: 100%; }
   body{
-    margin:0;
-    min-height:100vh;
-    font-family:'Quicksand', sans-serif;
-    color:var(--ink);
-    background:
-      radial-gradient(circle at 12% 15%, #ffe1ee 0%, transparent 45%),
-      radial-gradient(circle at 85% 10%, #dcefff 0%, transparent 40%),
-      radial-gradient(circle at 90% 85%, #e3ffe8 0%, transparent 45%),
-      linear-gradient(160deg, #fff5f8 0%, #fdf2ff 50%, #f2f8ff 100%);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding: 32px 16px;
-    position:relative;
-    overflow-x:hidden;
-  }
-  .bg-blob{
-    position:fixed;
-    font-size:34px;
-    opacity:0.35;
-    animation: float 8s ease-in-out infinite;
-    pointer-events:none;
-    user-select:none;
-  }
-  @keyframes float{
-    0%,100%{ transform: translateY(0) rotate(0deg); }
-    50%{ transform: translateY(-18px) rotate(8deg); }
-  }
-  .card{
-    width:100%;
-    max-width: 440px;
-    background: var(--card);
-    border-radius: 32px;
-    box-shadow: var(--shadow);
-    padding: 28px 26px 24px;
-    position:relative;
-    border: 3px solid #ffe6f0;
-  }
-  header{
-    text-align:center;
-    margin-bottom: 18px;
-  }
-  h1{
-    font-family:'Baloo 2', sans-serif;
-    font-size: 30px;
-    margin: 0 0 4px;
-    color: var(--pink-deep);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:8px;
-  }
-  h1 .wiggle{
-    display:inline-block;
-    animation: wiggle 2.4s ease-in-out infinite;
-  }
-  @keyframes wiggle{
-    0%,100%{ transform: rotate(0deg); }
-    25%{ transform: rotate(-10deg); }
-    75%{ transform: rotate(10deg); }
-  }
-  .subtitle{
-    font-size: 14px;
-    color: var(--ink-soft);
     margin: 0;
-  }
-  .counter-wrap{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    margin: 16px 0 14px;
-  }
-  .counter-track{
-    flex:1;
-    height: 10px;
-    background: #ffeef4;
-    border-radius: 999px;
-    overflow:hidden;
-  }
-  .counter-fill{
-    height:100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--pink), var(--lavender));
-    transition: width 0.4s cubic-bezier(.34,1.56,.64,1);
-    width:0%;
-  }
-  .counter-label{
-    font-family:'Baloo 2', sans-serif;
-    font-weight:700;
-    font-size: 13px;
-    color: var(--pink-deep);
-    white-space:nowrap;
-  }
-  form{
-    display:flex;
-    gap:8px;
-    margin-bottom: 16px;
-  }
-  input[type="text"]{
-    flex:1;
-    padding: 12px 16px;
-    border-radius: 18px;
-    border: 2px solid var(--line);
-    font-family:'Quicksand', sans-serif;
-    font-size: 15px;
-    font-weight:600;
+    background: var(--ground);
     color: var(--ink);
-    background: var(--cream);
-    outline:none;
-    transition: border-color .2s, box-shadow .2s;
-  }
-  input[type="text"]::placeholder{ color: #c8b8c4; font-weight:500; }
-  input[type="text"]:focus{
-    border-color: var(--pink);
-    box-shadow: 0 0 0 4px rgba(255,159,199,0.2);
-  }
-  input[type="text"]:disabled{
-    opacity: 0.6;
-    cursor:not-allowed;
-  }
-  button.add-btn{
-    width: 46px;
-    height: 46px;
-    flex-shrink:0;
-    border:none;
-    border-radius: 16px;
-    background: linear-gradient(135deg, var(--pink), var(--pink-deep));
-    color:white;
-    font-size: 22px;
-    font-weight:800;
-    cursor:pointer;
-    box-shadow: 0 6px 14px rgba(255,111,165,0.4);
-    transition: transform .15s ease, box-shadow .15s ease;
-  }
-  button.add-btn:hover{ transform: translateY(-2px) scale(1.04); }
-  button.add-btn:active{ transform: translateY(0) scale(0.94); }
-  button.add-btn:disabled{
-    background: #e6d9e2;
-    box-shadow:none;
-    cursor:not-allowed;
-    transform:none;
-  }
-  .full-msg{
-    text-align:center;
-    font-size: 13px;
-    font-weight:600;
-    color: var(--pink-deep);
-    background: #fff0f6;
-    border: 1.5px dashed #ffc3dc;
-    border-radius: 14px;
-    padding: 8px 10px;
-    margin: -6px 0 14px;
-    display:none;
-  }
-  .full-msg.show{ display:block; animation: pop .3s ease; }
-  @keyframes pop{
-    0%{ transform: scale(0.9); opacity:0; }
-    100%{ transform: scale(1); opacity:1; }
-  }
-  ul#list{
-    list-style:none;
-    margin:0;
-    padding:0;
-    display:flex;
-    flex-direction:column;
-    gap: 10px;
-    min-height: 40px;
-  }
-  li.task{
-    position:relative;
-    display:flex;
-    align-items:center;
-    gap: 12px;
-    background: var(--cream);
-    border: 2px solid var(--line);
-    border-radius: 18px;
-    padding: 10px 12px;
-    transition: transform .25s ease, background .3s ease, border-color .3s ease;
-    animation: slideIn .35s cubic-bezier(.34,1.56,.64,1);
-    overflow: visible;
-  }
-  @keyframes slideIn{
-    from{ opacity:0; transform: translateY(-10px) scale(0.96); }
-    to{ opacity:1; transform: translateY(0) scale(1); }
-  }
-  li.task.removing{
-    animation: slideOut .28s ease forwards;
-  }
-  @keyframes slideOut{
-    to{ opacity:0; transform: translateX(30px) scale(0.9); height:0; padding-top:0; padding-bottom:0; margin:0; }
-  }
-  li.task.done{
-    background: #f2fbf6;
-    border-color: #cdeedb;
-  }
-  .checkbox{
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 2.5px solid var(--pink);
-    flex-shrink:0;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background: white;
-    transition: background .25s ease, border-color .25s ease, transform .2s ease;
-    position:relative;
-  }
-  .checkbox:hover{ transform: scale(1.08); }
-  .checkbox svg{
-    width: 15px;
-    height: 15px;
-    opacity:0;
-    transform: scale(0.5);
-    transition: opacity .2s ease, transform .2s ease;
-  }
-  li.task.done .checkbox{
-    background: var(--mint);
-    border-color: #7fd9a6;
-  }
-  li.task.done .checkbox svg{
-    opacity:1;
-    transform: scale(1);
-  }
-  .task-text{
-    flex:1;
+    font-family: 'Quicksand', ui-rounded, 'Segoe UI', system-ui, sans-serif;
     font-size: 15px;
-    font-weight:600;
-    color: var(--ink);
-    word-break: break-word;
-    transition: color .3s ease;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
   }
-  li.task.done .task-text{
-    color: #8fb8a0;
-    text-decoration: line-through;
-    text-decoration-color: #9fd6b6;
-    text-decoration-thickness: 2px;
+  img{ max-width: 100%; }
+
+  .wrap{
+    max-width: 880px; margin: 0 auto;
+    padding: 36px 20px 72px;
+    display: flex; flex-direction: column; gap: 26px;
   }
-  .del-btn{
-    border:none;
-    background:transparent;
-    color: #d9b8c8;
-    font-size: 18px;
-    cursor:pointer;
-    padding: 4px 6px;
-    border-radius: 10px;
-    line-height:1;
-    transition: color .2s ease, background .2s ease, transform .2s ease;
-    flex-shrink:0;
+  .mono{
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    font-variant-numeric: tabular-nums;
   }
-  .del-btn:hover{
-    color: var(--pink-deep);
-    background: #ffe6f0;
-    transform: scale(1.1) rotate(8deg);
+
+  /* masthead */
+  .masthead{ display: flex; flex-direction: column; gap: 5px; }
+  h1{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-weight: 800; font-size: clamp(28px, 5vw, 36px);
+    margin: 0; line-height: 1.1; color: var(--pink);
+    display: flex; align-items: center; gap: 9px;
   }
-  .empty-state{
-    text-align:center;
-    padding: 26px 10px 6px;
-    color: var(--ink-soft);
+  h1 .wig{ display: inline-block; animation: wig 2.6s ease-in-out infinite; }
+  @keyframes wig{ 0%,100%{ transform: rotate(0); } 25%{ transform: rotate(-11deg); } 75%{ transform: rotate(11deg); } }
+  .rule-line{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint);
   }
-  .empty-state .emoji{
-    font-size: 40px;
-    display:block;
-    margin-bottom: 6px;
-    animation: float 4s ease-in-out infinite;
+
+  /* goal tabs */
+  .goalbar{ display: flex; flex-direction: column; gap: 10px; }
+  .goalbar-top{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .section-h{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-size: 18px; font-weight: 700; margin: 0; color: var(--ink);
   }
-  .empty-state p{
-    margin:0;
-    font-size: 14px;
-    font-weight:600;
+  .tabs{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+  .tab{
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px; text-align: left; min-width: 0;
+    background: var(--card); color: inherit; font: inherit;
+    border: 1.5px solid var(--rule); border-radius: 14px; cursor: pointer;
+    transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease;
   }
-  /* particle burst on completion */
-  .particle{
-    position:absolute;
-    left: 23px;
-    top: 50%;
-    font-size: 14px;
-    pointer-events:none;
-    will-change: transform, opacity;
-    animation: burst 0.7s ease-out forwards;
+  .tab:hover{ transform: translateY(-2px); box-shadow: var(--shadow); }
+  .tab:focus-visible{ outline: 2px solid var(--lav); outline-offset: 2px; }
+  .tab[aria-selected="true"]{ border-color: var(--pink); box-shadow: var(--shadow); }
+  .tab.complete[aria-selected="true"]{ border-color: var(--mint); }
+  .tab-ring{ flex: none; width: 26px; height: 26px; }
+  .tab-ring svg{ transform: rotate(-90deg); display: block; }
+  .tab-txt{ min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .tab-name{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-weight: 700; font-size: 13px; line-height: 1.25;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  @keyframes burst{
-    0%{ opacity:1; transform: translate(-50%,-50%) scale(0.6) translate(0,0); }
-    100%{ opacity:0; transform: translate(-50%,-50%) scale(1.1) translate(var(--dx), var(--dy)); }
+  .tab-meta{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px; color: var(--ink-soft); white-space: nowrap;
   }
-  .celebrate-overlay{
-    position: fixed;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    pointer-events:none;
-    z-index: 50;
+  .tab.add{
+    justify-content: center; border-style: dashed; color: var(--ink-soft);
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif; font-weight: 700; font-size: 13.5px;
   }
-  .celebrate-card{
-    background: white;
-    border-radius: 24px;
-    padding: 22px 30px;
-    box-shadow: 0 20px 50px rgba(255,111,165,0.35);
-    text-align:center;
-    font-family:'Baloo 2', sans-serif;
-    font-size: 20px;
-    color: var(--pink-deep);
-    border: 3px solid #ffdcec;
-    opacity:0;
-    transform: scale(0.7);
-    animation: celebratePop 2.2s ease forwards;
+  .tab.add:hover{ color: var(--pink); border-color: var(--pink); }
+
+  /* goal card */
+  .goal{
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 22px; box-shadow: var(--shadow-lift);
+    padding: 21px 24px; display: flex; align-items: center; gap: 20px;
+    position: relative; overflow: hidden;
   }
-  @keyframes celebratePop{
-    0%{ opacity:0; transform: scale(0.6); }
-    15%{ opacity:1; transform: scale(1.08); }
-    25%{ transform: scale(1); }
-    80%{ opacity:1; transform: scale(1); }
-    100%{ opacity:0; transform: scale(0.9); }
+  .goal::before{
+    content:""; position: absolute; inset: 0 auto 0 0; width: 5px;
+    background: linear-gradient(180deg, var(--pink), var(--lav));
   }
-  .confetti-piece{
-    position: fixed;
-    top: -20px;
-    font-size: 18px;
-    z-index: 49;
-    pointer-events:none;
-    animation: confettiFall linear forwards;
+  .goal.complete::before{ background: var(--mint); }
+  .goal-body{ flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .goal-label{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase; color: var(--ink-faint);
   }
-  @keyframes confettiFall{
-    to{ transform: translateY(110vh) rotate(360deg); opacity: 0.9; }
+  .goal-title{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-size: 24px; font-weight: 800; line-height: 1.15; margin: 0;
+    color: var(--ink); text-wrap: balance;
   }
-  footer{
-    text-align:center;
-    margin-top: 18px;
-    font-size: 12px;
-    color: var(--ink-soft);
+  .goal-stats{
+    display: flex; flex-wrap: wrap; gap: 5px 18px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px; color: var(--ink-soft);
   }
-  @media (max-width: 480px){
-    .card{ padding: 22px 18px 20px; border-radius: 24px; }
-    h1{ font-size: 26px; }
+  .goal-stats b{ color: var(--ink); font-weight: 700; }
+  /* The ring is read-only, and its inset:0 label otherwise covers the
+     delete button in the card's top-right corner and eats the clicks. */
+  .ring{ flex: none; width: 84px; height: 84px; position: relative; pointer-events: none; }
+  .ring svg{ transform: rotate(-90deg); display: block; }
+  .ring-pct{
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-weight: 800; font-size: 20px; color: var(--ink);
+  }
+  .goal-kill{
+    position: absolute; top: 11px; right: 13px; z-index: 2;
+    background: none; border: 0; cursor: pointer; font-size: 16px; line-height: 1;
+    color: var(--ink-faint); border-radius: 8px; padding: 4px 7px;
+    transition: color .18s ease, background .18s ease;
+  }
+  .goal-kill:hover{ color: var(--pink); background: var(--pink-wash); }
+  .goal-kill:focus-visible{ outline: 2px solid var(--lav); outline-offset: 1px; }
+
+  /* editable text */
+  .nm{
+    cursor: text; border-radius: 7px; padding: 1px 5px; margin-left: -5px;
+    transition: background .16s ease, box-shadow .16s ease;
+  }
+  .nm:hover{ background: var(--card-sunk); box-shadow: inset 0 0 0 1px var(--rule); }
+  .nm:focus-visible{ outline: 2px solid var(--lav); outline-offset: 1px; }
+  .edit{
+    font: inherit; color: var(--ink); background: var(--card-sunk);
+    border: 1.5px solid var(--pink); border-radius: 8px;
+    padding: 1px 6px; outline: none; width: 100%; max-width: 100%;
+  }
+
+  /* systems */
+  .systems{ display: flex; flex-direction: column; gap: 11px; }
+  .sys{
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 16px; overflow: hidden; position: relative;
+    transition: border-color .3s ease;
+  }
+  .sys.is-done{ border-color: color-mix(in srgb, var(--mint) 45%, var(--rule)); }
+  .sys-head{
+    display: grid; grid-template-columns: auto 1fr auto; gap: 13px; align-items: center;
+    padding: 13px 16px; cursor: pointer;
+  }
+  .sys-head:hover{ background: var(--card-sunk); }
+  .sys-code{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--ink-faint);
+    align-self: start; padding-top: 3px;
+  }
+  .sys-main{ min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+  .sys-name{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-weight: 700; font-size: 16.5px; line-height: 1.25;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .chip{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; font-weight: 700; white-space: nowrap;
+  }
+  .chip.todo{ background: var(--ground-tint); color: var(--ink-soft); }
+  .chip.wip{  background: var(--peach-wash); color: var(--peach); }
+  .chip.done{ background: var(--mint-wash);  color: var(--mint); }
+  .bar{ height: 6px; border-radius: 999px; background: var(--ground-tint); overflow: hidden; }
+  .bar span{
+    display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--pink), var(--lav));
+    transition: width .45s cubic-bezier(.34,1.4,.64,1);
+  }
+  .sys.is-done .bar span{ background: var(--mint); }
+  .sys-tools{
+    display: flex; align-items: center; gap: 4px; align-self: start;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px; color: var(--ink-soft); white-space: nowrap;
+  }
+  .icon-btn{
+    background: none; border: 0; cursor: pointer; padding: 4px 6px;
+    color: var(--ink-faint); border-radius: 8px; line-height: 1; font-size: 14px;
+    display: grid; place-items: center;
+    transition: color .18s ease, background .18s ease;
+  }
+  .icon-btn:hover{ color: var(--pink); background: var(--pink-wash); }
+  .icon-btn:focus-visible{ outline: 2px solid var(--lav); outline-offset: 1px; }
+  .caret{ transition: transform .25s ease; display: block; }
+  .sys.open .caret{ transform: rotate(90deg); }
+  .sys-body{ padding: 0 16px 14px; display: none; }
+  .sys.open .sys-body{ display: block; }
+
+  /* tasks */
+  .tasks{ list-style: none; margin: 0; padding: 0 0 0 4px; }
+  .task{
+    display: grid; grid-template-columns: auto 1fr auto; gap: 11px; align-items: start;
+    padding: 10px 0 10px 20px; border-left: 2px solid var(--rule); position: relative;
+  }
+  .task::before{
+    content:""; position: absolute; left: 0; top: 21px; width: 13px; height: 2px; background: var(--rule);
+  }
+  .task:last-child{ border-left-color: transparent; }
+  .task:last-child::after{
+    content:""; position: absolute; left: -2px; top: 0; height: 21px; width: 2px; background: var(--rule);
+  }
+  .box{
+    position: relative; width: 21px; height: 21px; flex: none; margin-top: 1px; padding: 0;
+    border-radius: 7px; border: 2px solid var(--rule-strong); background: var(--card);
+    cursor: pointer; display: grid; place-items: center;
+    transition: background .25s ease, border-color .25s ease, transform .18s ease;
+  }
+  .box:hover{ transform: scale(1.12); border-color: var(--pink); }
+  .box:focus-visible{ outline: 2px solid var(--lav); outline-offset: 2px; }
+  .box svg{
+    width: 12px; height: 12px; opacity: 0; transform: scale(.4);
+    transition: opacity .2s ease, transform .25s cubic-bezier(.34,1.6,.64,1);
+  }
+  .task.done .box{ background: var(--mint); border-color: var(--mint); }
+  .task.done .box svg{ opacity: 1; transform: scale(1); }
+  .task-text{ min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .task-title{ font-weight: 600; font-size: 14.5px; line-height: 1.4; transition: color .3s ease; }
+  .task.done .task-title{
+    color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--mint);
+  }
+  .dod{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px; line-height: 1.5; color: var(--ink-soft);
+  }
+  .dod b{ color: var(--ink-faint); font-weight: 500; letter-spacing: .04em; }
+  .dod.empty{ color: var(--ink-faint); font-style: italic; }
+  .task .icon-btn{ opacity: 0; }
+  .task:hover .icon-btn, .task .icon-btn:focus-visible{ opacity: 1; }
+
+  /* add rows */
+  .addrow{ display: flex; gap: 7px; padding: 10px 0 0 24px; flex-wrap: wrap; }
+  .addrow input{
+    flex: 1 1 190px; min-width: 0;
+    font-family: 'Quicksand', system-ui, sans-serif;
+    font-size: 13.5px; font-weight: 600; color: var(--ink);
+    background: var(--card-sunk); border: 1.5px solid var(--rule);
+    border-radius: 10px; padding: 8px 12px; outline: none;
+    transition: border-color .2s ease;
+  }
+  .addrow input.dod-in{
+    flex: 1 1 210px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; font-weight: 400;
+  }
+  .addrow input::placeholder{ color: var(--ink-faint); font-weight: 500; }
+  .addrow input:focus{ border-color: var(--pink); }
+  .btn{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-weight: 700; font-size: 14px; border: 0; border-radius: 10px;
+    cursor: pointer; padding: 8px 16px; color: #fff;
+    background: linear-gradient(135deg, var(--pink), var(--lav));
+    transition: transform .15s ease;
+  }
+  .btn:hover{ transform: translateY(-1px); }
+  .btn:focus-visible{ outline: 2px solid var(--lav); outline-offset: 2px; }
+  .btn:disabled{ background: var(--ground-tint); color: var(--ink-faint); cursor: not-allowed; transform: none; }
+  .cap-note{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; color: var(--ink-faint);
+  }
+  .sys-body > .cap-note{ padding: 9px 0 0 24px; }
+  .add-sys-row{ display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .add-sys-row .btn{ padding: 10px 18px; }
+
+  /* empty states */
+  .empty{
+    background: var(--card); border: 1.5px dashed var(--rule-strong);
+    border-radius: 16px; padding: 30px 24px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+  }
+  .empty .emo{ font-size: 34px; line-height: 1; }
+  .empty p{ margin: 0; color: var(--ink-soft); font-size: 14px; max-width: 44ch; }
+  .empty strong{
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-size: 16.5px; font-weight: 700; color: var(--ink);
+  }
+  .empty .btn{ margin-top: 9px; }
+  .task-empty{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11.5px; color: var(--ink-faint); padding: 4px 0 0 24px;
+  }
+
+  /* motion */
+  .seal{
+    position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
+    font-weight: 800; font-size: 15px; letter-spacing: .1em; color: var(--mint);
+    background: color-mix(in srgb, var(--mint-wash) 82%, transparent);
+    border-radius: 16px; opacity: 0;
+  }
+  .sealing .seal{ animation: seal 1.15s cubic-bezier(.2,1.4,.5,1) forwards; }
+  @keyframes seal{
+    0%{ opacity:0; transform: scale(1.5) rotate(-9deg); }
+    28%{ opacity:1; transform: scale(1) rotate(-4deg); }
+    72%{ opacity:1; transform: scale(1) rotate(-4deg); }
+    100%{ opacity:0; transform: scale(.96) rotate(-4deg); }
+  }
+  .spark{
+    position: absolute; left: 50%; top: 50%; font-size: 13px; pointer-events: none;
+    animation: spark .72s ease-out forwards;
+  }
+  @keyframes spark{
+    0%{ opacity:1; transform: translate(-50%,-50%) scale(.5); }
+    100%{ opacity:0; transform: translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(1.1); }
+  }
+  .confetti{ position: fixed; top: -24px; z-index: 60; pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall{ to{ transform: translateY(108vh) rotate(400deg); } }
+  .toast{
+    position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); z-index: 61;
+    pointer-events: none; background: var(--card); color: var(--ink);
+    border: 2px solid color-mix(in srgb, var(--mint) 50%, var(--rule));
+    box-shadow: var(--shadow-lift); border-radius: 15px; padding: 12px 22px;
+    font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif; font-weight: 700; font-size: 16px;
+    text-align: center; max-width: min(92vw, 420px);
+    animation: toast 2.6s ease forwards;
+  }
+  .toast.finale{ border-color: var(--lav); font-size: 17px; }
+  @keyframes toast{
+    0%{ opacity:0; transform: translateX(-50%) translateY(14px) scale(.94); }
+    12%{ opacity:1; transform: translateX(-50%) translateY(0) scale(1); }
+    82%{ opacity:1; }
+    100%{ opacity:0; transform: translateX(-50%) translateY(-6px); }
+  }
+
+  .foot{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; color: var(--ink-faint); text-align: center; margin: 0;
+  }
+
+  @media (max-width: 700px){
+    .tabs{ grid-template-columns: repeat(2, 1fr); }
+    .goal{ flex-direction: column; align-items: flex-start; gap: 15px; }
+    .sys-head{ grid-template-columns: auto 1fr; }
+    .sys-tools{ grid-column: 2; justify-content: flex-end; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   }
 </style>
 </head>
 <body>
-  <span class="bg-blob" style="top:8%; left:6%;">🌸</span>
-  <span class="bg-blob" style="top:15%; right:8%; animation-delay:1s;">✨</span>
-  <span class="bg-blob" style="bottom:10%; left:10%; animation-delay:2s;">🍡</span>
-  <span class="bg-blob" style="bottom:14%; right:7%; animation-delay:1.5s;">🎀</span>
+<div class="wrap">
 
-  <div class="card">
-    <header>
-      <h1><span class="wiggle">🐣</span> Cute To-Do <span class="wiggle" style="animation-delay:1.2s;">🎀</span></h1>
-      <p class="subtitle">Ten little tasks, one cozy list</p>
-    </header>
+  <header class="masthead">
+    <h1><span class="wig">🐣</span> Cute To-Do</h1>
+    <p class="rule-line">4 goals · 4 systems each · 4 tasks each</p>
+  </header>
 
-    <div class="counter-wrap">
-      <div class="counter-track"><div class="counter-fill" id="counterFill"></div></div>
-      <span class="counter-label" id="counterLabel">0 / 10</span>
+  <section class="goalbar">
+    <div class="goalbar-top">
+      <h2 class="section-h">Your goals</h2>
+      <span class="cap-note" id="goalCap"></span>
     </div>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Goals"></div>
+  </section>
 
-    <form id="taskForm">
-      <input type="text" id="taskInput" placeholder="Add a little task..." maxlength="80" autocomplete="off" />
-      <button type="submit" class="add-btn" id="addBtn" aria-label="Add task">+</button>
-    </form>
-
-    <div class="full-msg" id="fullMsg">Your list is full! 🌷 Finish or remove a task to add another.</div>
-
-    <ul id="list"></ul>
-
-    <div class="empty-state" id="emptyState">
-      <span class="emoji">🐰</span>
-      <p>No tasks yet — add up to 10!</p>
+  <section class="goal" id="goalCard" hidden>
+    <button class="goal-kill" id="goalKill" type="button" aria-label="Delete this goal" title="Delete this goal">&#215;</button>
+    <div class="goal-body">
+      <div class="goal-label" id="goalLabel">Goal</div>
+      <h2 class="goal-title"><span class="nm" id="goalTitle" tabindex="0" role="button" title="Click to rename"></span></h2>
+      <div class="goal-stats">
+        <span><b id="statSys">0</b> / <b id="statSysTotal">0</b> systems complete</span>
+        <span><b id="statTask">0</b> / <b id="statTaskTotal">0</b> tasks ticked</span>
+      </div>
     </div>
+    <div class="ring">
+      <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
+        <circle cx="42" cy="42" r="35" fill="none" stroke="var(--ground-tint)" stroke-width="9"></circle>
+        <circle id="ringArc" cx="42" cy="42" r="35" fill="none" stroke="var(--pink)"
+                stroke-width="9" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="220"
+                style="transition: stroke-dashoffset .5s cubic-bezier(.34,1.3,.64,1), stroke .4s ease"></circle>
+      </svg>
+      <div class="ring-pct" id="ringPct">0%</div>
+    </div>
+  </section>
 
-    <footer>made with 💗 for tiny productive days</footer>
+  <section class="systems" id="systems"></section>
+
+  <div class="add-sys-row" id="addSysRow" hidden>
+    <button class="btn" id="addSys" type="button">+ Add system</button>
+    <span class="cap-note" id="sysCap"></span>
   </div>
+
+  <div class="empty" id="noGoals" hidden>
+    <span class="emo">🌱</span>
+    <strong>Nothing on the board yet</strong>
+    <p>Start with a goal — the outcome you actually want. You can keep up to four running at once.</p>
+    <button class="btn" id="firstGoal" type="button">+ Add your first goal</button>
+  </div>
+
+  <p class="foot">Saved in this browser only 🌸</p>
+</div>
 
 <script>
 (function(){
-  const MAX_TASKS = 10;
-  const STORAGE_KEY = 'cute-todo-tasks-v1';
+  'use strict';
 
-  const listEl = document.getElementById('list');
-  const formEl = document.getElementById('taskForm');
-  const inputEl = document.getElementById('taskInput');
-  const addBtn = document.getElementById('addBtn');
-  const fullMsg = document.getElementById('fullMsg');
-  const emptyState = document.getElementById('emptyState');
-  const counterFill = document.getElementById('counterFill');
-  const counterLabel = document.getElementById('counterLabel');
+  var MAX_GOALS = 4, MAX_SYSTEMS = 4, MAX_TASKS = 4;
+  var RING = 220, TABRING = 69;
+  var KEY = 'cute-systems-todo-v1';
 
-  let tasks = loadTasks();
+  var uid = 0;
+  function nid(){ return 'n' + (Date.now().toString(36)) + (++uid).toString(36); }
 
-  function loadTasks(){
+  var goals = [];
+  var sel = 0;
+
+  /* ---------- storage ---------- */
+  function load(){
     try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return [];
-      const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed)) return parsed.slice(0, MAX_TASKS);
-      return [];
-    }catch(e){
-      return [];
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      var d = JSON.parse(raw);
+      if (!d || !Array.isArray(d.goals)) return null;
+      // rebuild defensively so a hand-edited or partial payload cannot break rendering
+      return {
+        goals: d.goals.slice(0, MAX_GOALS).map(function(g){
+          return {
+            id: g && g.id ? String(g.id) : nid(),
+            name: g && g.name ? String(g.name) : 'Untitled goal',
+            systems: (g && Array.isArray(g.systems) ? g.systems : []).slice(0, MAX_SYSTEMS).map(function(s){
+              return {
+                id: s && s.id ? String(s.id) : nid(),
+                name: s && s.name ? String(s.name) : 'Untitled system',
+                open: !!(s && s.open),
+                tasks: (s && Array.isArray(s.tasks) ? s.tasks : []).slice(0, MAX_TASKS).map(function(t){
+                  return {
+                    id: t && t.id ? String(t.id) : nid(),
+                    title: t && t.title ? String(t.title) : '',
+                    dod: t && t.dod ? String(t.dod) : '',
+                    done: !!(t && t.done)
+                  };
+                }).filter(function(t){ return t.title; })
+              };
+            })
+          };
+        }),
+        sel: typeof d.sel === 'number' ? d.sel : 0
+      };
+    }catch(e){ return null; }
+  }
+
+  function save(){
+    try{
+      localStorage.setItem(KEY, JSON.stringify({ goals: goals, sel: sel }));
+    }catch(e){ /* private mode or storage full — the board still works this session */ }
+  }
+
+  /* ---------- derived ---------- */
+  function sysDone(s){
+    return s.tasks.length > 0 && s.tasks.every(function(t){ return t.done; });
+  }
+  function goalDone(g){
+    return g.systems.length > 0 && g.systems.every(sysDone);
+  }
+  function tally(g){
+    var all = 0, done = 0;
+    g.systems.forEach(function(s){
+      all += s.tasks.length;
+      done += s.tasks.filter(function(t){ return t.done; }).length;
+    });
+    return { all: all, done: done, pct: all ? Math.round(done / all * 100) : 0 };
+  }
+  function statusOf(s){
+    if (!s.tasks.length) return ['todo', 'Not started'];
+    if (s.tasks.every(function(t){ return t.done; })) return ['done', 'Complete'];
+    if (s.tasks.some(function(t){ return t.done; }))  return ['wip', 'In progress'];
+    return ['todo', 'Not started'];
+  }
+
+  var el = function(id){ return document.getElementById(id); };
+  var tabsEl = el('tabs'), systemsEl = el('systems'), goalCard = el('goalCard');
+  var ringArc = el('ringArc'), ringPct = el('ringPct');
+  var addSysBtn = el('addSys'), addSysRow = el('addSysRow');
+  var sysCapEl = el('sysCap'), goalCapEl = el('goalCap');
+  var noGoals = el('noGoals'), goalTitleEl = el('goalTitle');
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- inline rename ---------- */
+  function startEdit(node, current, commit, placeholder){
+    if (node.dataset.editing === '1') return;
+    node.dataset.editing = '1';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'edit';
+    input.value = current;
+    input.maxLength = 80;
+    if (placeholder) input.placeholder = placeholder;
+    node.textContent = '';
+    node.appendChild(input);
+    input.focus();
+    input.select();
+
+    var settled = false;
+    function finish(keep){
+      if (settled) return;
+      settled = true;
+      node.dataset.editing = '0';
+      var v = input.value.trim();
+      if (keep && v) commit(v);
+      render();
     }
+    // The input lives inside a .nm node that has its own Enter/Space handler.
+    // Without this, every keystroke bubbles up: Space gets preventDefault()ed
+    // (untypeable spaces) and Enter reopens the editor it just closed.
+    input.addEventListener('keydown', function(e){
+      e.stopPropagation();
+      if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', function(){ finish(true); });
+    input.addEventListener('click', function(e){ e.stopPropagation(); });
   }
 
-  function saveTasks(){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    }catch(e){ /* storage unavailable, ignore */ }
+  /* ---------- render ---------- */
+  function renderTabs(){
+    tabsEl.textContent = '';
+    goals.forEach(function(g, i){
+      var t = tally(g), complete = goalDone(g);
+      var b = document.createElement('button');
+      b.className = 'tab' + (complete ? ' complete' : '');
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(i === sel));
+
+      var ring = document.createElement('span');
+      ring.className = 'tab-ring';
+      ring.innerHTML =
+        '<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">' +
+          '<circle cx="13" cy="13" r="11" fill="none" stroke="var(--ground-tint)" stroke-width="4"></circle>' +
+          '<circle cx="13" cy="13" r="11" fill="none" stroke="' + (complete ? 'var(--mint)' : 'var(--pink)') +
+          '" stroke-width="4" stroke-linecap="round" stroke-dasharray="' + TABRING +
+          '" stroke-dashoffset="' + (TABRING - TABRING * t.pct / 100) + '"></circle>' +
+        '</svg>';
+
+      var txt = document.createElement('span');
+      txt.className = 'tab-txt';
+      var nm = document.createElement('span');
+      nm.className = 'tab-name';
+      nm.textContent = g.name;
+      var meta = document.createElement('span');
+      meta.className = 'tab-meta';
+      meta.textContent = t.done + '/' + t.all + ' tasks';
+      txt.appendChild(nm);
+      txt.appendChild(meta);
+
+      b.appendChild(ring);
+      b.appendChild(txt);
+      b.addEventListener('click', function(){ sel = i; save(); render(); });
+      tabsEl.appendChild(b);
+    });
+
+    if (goals.length < MAX_GOALS){
+      var add = document.createElement('button');
+      add.className = 'tab add';
+      add.type = 'button';
+      add.textContent = '+ Add goal';
+      add.addEventListener('click', addGoal);
+      tabsEl.appendChild(add);
+    }
+
+    goalCapEl.textContent = goals.length + ' / ' + MAX_GOALS + ' goals' +
+      (goals.length >= MAX_GOALS ? ' — ceiling reached' : '');
   }
 
-  function uid(){
-    return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-  }
+  function renderGoal(){
+    var g = goals[sel];
+    var has = !!g;
+    goalCard.hidden = !has;
+    addSysRow.hidden = !has;
+    noGoals.hidden = has;
+    systemsEl.textContent = '';
+    if (!has) return;
 
-  function render(){
-    listEl.innerHTML = '';
-    if(tasks.length === 0){
-      emptyState.style.display = 'block';
+    goalTitleEl.textContent = g.name;
+    el('goalLabel').textContent = 'Goal ' + (sel + 1) + ' of ' + goals.length;
+    goalCard.classList.toggle('complete', goalDone(g));
+
+    var t = tally(g);
+    el('statSys').textContent = g.systems.filter(sysDone).length;
+    el('statSysTotal').textContent = g.systems.length;
+    el('statTask').textContent = t.done;
+    el('statTaskTotal').textContent = t.all;
+    ringArc.setAttribute('stroke-dashoffset', String(RING - RING * t.pct / 100));
+    ringArc.setAttribute('stroke', t.pct === 100 ? 'var(--mint)' : 'var(--pink)');
+    ringPct.textContent = t.pct + '%';
+
+    if (!g.systems.length){
+      var e = document.createElement('div');
+      e.className = 'empty';
+      e.innerHTML =
+        '<span class="emo">🧩</span>' +
+        '<strong>No systems yet</strong>' +
+        '<p>Break this goal into the areas it is really made of. Four at most — if you need a fifth, two of them are probably the same thing.</p>';
+      systemsEl.appendChild(e);
     } else {
-      emptyState.style.display = 'none';
-      tasks.forEach(task => listEl.appendChild(buildTaskEl(task)));
+      g.systems.forEach(function(sys, i){
+        systemsEl.appendChild(buildSystem(g, sys, i));
+      });
     }
 
-    const atLimit = tasks.length >= MAX_TASKS;
-    inputEl.disabled = atLimit;
-    addBtn.disabled = atLimit;
-    fullMsg.classList.toggle('show', atLimit);
-
-    counterFill.style.width = ((tasks.length / MAX_TASKS) * 100) + '%';
-    counterLabel.textContent = tasks.length + ' / ' + MAX_TASKS;
+    addSysBtn.disabled = g.systems.length >= MAX_SYSTEMS;
+    sysCapEl.textContent = g.systems.length + ' / ' + MAX_SYSTEMS + ' systems in this goal' +
+      (g.systems.length >= MAX_SYSTEMS ? ' — ceiling reached' : '');
   }
 
-  function buildTaskEl(task){
-    const li = document.createElement('li');
+  function buildSystem(goal, sys, i){
+    var st = statusOf(sys), cls = st[0], label = st[1];
+    var dc = sys.tasks.filter(function(t){ return t.done; }).length;
+    var pct = sys.tasks.length ? Math.round(dc / sys.tasks.length * 100) : 0;
+
+    var card = document.createElement('article');
+    card.className = 'sys' + (sys.open ? ' open' : '') + (cls === 'done' ? ' is-done' : '');
+
+    var seal = document.createElement('div');
+    seal.className = 'seal';
+    seal.textContent = 'SYSTEM COMPLETE';
+    card.appendChild(seal);
+
+    /* head */
+    var head = document.createElement('div');
+    head.className = 'sys-head';
+
+    var code = document.createElement('span');
+    code.className = 'sys-code';
+    code.textContent = 'SYS-0' + (i + 1);
+
+    var main = document.createElement('div');
+    main.className = 'sys-main';
+
+    var nameRow = document.createElement('div');
+    nameRow.className = 'sys-name';
+    var nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.tabIndex = 0;
+    nm.setAttribute('role', 'button');
+    nm.title = 'Click to rename';
+    nm.textContent = sys.name;
+    nm.addEventListener('click', function(e){
+      e.stopPropagation();
+      startEdit(nm, sys.name, function(v){ sys.name = v; save(); });
+    });
+    nm.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault(); e.stopPropagation();
+        startEdit(nm, sys.name, function(v){ sys.name = v; save(); });
+      }
+    });
+    var chip = document.createElement('span');
+    chip.className = 'chip ' + cls;
+    chip.textContent = label;
+    nameRow.appendChild(nm);
+    nameRow.appendChild(chip);
+
+    var bar = document.createElement('div');
+    bar.className = 'bar';
+    var fill = document.createElement('span');
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+
+    main.appendChild(nameRow);
+    main.appendChild(bar);
+
+    var tools = document.createElement('div');
+    tools.className = 'sys-tools';
+    var count = document.createElement('span');
+    count.className = 'mono';
+    count.textContent = dc + '/' + sys.tasks.length;
+
+    var toggle = document.createElement('button');
+    toggle.className = 'icon-btn';
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', String(!!sys.open));
+    toggle.setAttribute('aria-label', (sys.open ? 'Collapse ' : 'Expand ') + sys.name);
+    toggle.innerHTML = '<svg class="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" ' +
+      'aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+
+    var killSys = document.createElement('button');
+    killSys.className = 'icon-btn';
+    killSys.type = 'button';
+    killSys.setAttribute('aria-label', 'Delete system ' + sys.name);
+    killSys.title = 'Delete system';
+    killSys.textContent = '×';
+    killSys.addEventListener('click', function(e){
+      e.stopPropagation();
+      goal.systems = goal.systems.filter(function(s){ return s.id !== sys.id; });
+      save(); render();
+    });
+
+    tools.appendChild(count);
+    tools.appendChild(toggle);
+    tools.appendChild(killSys);
+
+    head.appendChild(code);
+    head.appendChild(main);
+    head.appendChild(tools);
+    head.addEventListener('click', function(){
+      sys.open = !sys.open; save(); render();
+    });
+    card.appendChild(head);
+
+    /* body */
+    var body = document.createElement('div');
+    body.className = 'sys-body';
+
+    if (sys.tasks.length){
+      var list = document.createElement('ul');
+      list.className = 'tasks';
+      sys.tasks.forEach(function(task){
+        list.appendChild(buildTask(goal, sys, task, card));
+      });
+      body.appendChild(list);
+    } else {
+      var te = document.createElement('div');
+      te.className = 'task-empty';
+      te.textContent = 'No tasks yet — an empty system never counts as done.';
+      body.appendChild(te);
+    }
+
+    if (sys.tasks.length < MAX_TASKS){
+      var row = document.createElement('div');
+      row.className = 'addrow';
+      var tIn = document.createElement('input');
+      tIn.type = 'text';
+      tIn.placeholder = 'New task…';
+      tIn.maxLength = 90;
+      var dIn = document.createElement('input');
+      dIn.type = 'text';
+      dIn.className = 'dod-in';
+      dIn.placeholder = 'done when… (optional)';
+      dIn.maxLength = 110;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.textContent = 'Add';
+
+      function submit(){
+        var v = tIn.value.trim();
+        if (!v || sys.tasks.length >= MAX_TASKS) return;
+        sys.tasks.push({ id: nid(), title: v, dod: dIn.value.trim(), done: false });
+        sys.open = true;
+        save(); render();
+      }
+      btn.addEventListener('click', submit);
+      function onKey(e){ if (e.key === 'Enter'){ e.preventDefault(); submit(); } }
+      tIn.addEventListener('keydown', onKey);
+      dIn.addEventListener('keydown', onKey);
+
+      row.appendChild(tIn);
+      row.appendChild(dIn);
+      row.appendChild(btn);
+      body.appendChild(row);
+    } else {
+      var note = document.createElement('div');
+      note.className = 'cap-note';
+      note.textContent = 'System full at ' + MAX_TASKS + ' tasks — finish one, or split the system.';
+      body.appendChild(note);
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function buildTask(goal, sys, task, card){
+    var li = document.createElement('li');
     li.className = 'task' + (task.done ? ' done' : '');
-    li.dataset.id = task.id;
 
-    const checkbox = document.createElement('button');
-    checkbox.type = 'button';
-    checkbox.className = 'checkbox';
-    checkbox.setAttribute('aria-label', task.done ? 'Mark as not done' : 'Mark as done');
-    checkbox.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-    checkbox.addEventListener('click', () => toggleTask(task.id, checkbox, li));
+    var box = document.createElement('button');
+    box.className = 'box';
+    box.type = 'button';
+    box.setAttribute('aria-pressed', String(!!task.done));
+    box.setAttribute('aria-label', (task.done ? 'Untick: ' : 'Tick: ') + task.title);
+    box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<polyline points="20 6 9 17 4 12"></polyline></svg>';
+    box.addEventListener('click', function(){ toggle(goal, sys, task, li, box, card); });
 
-    const text = document.createElement('span');
+    var text = document.createElement('div');
     text.className = 'task-text';
-    text.textContent = task.text;
 
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'del-btn';
-    del.setAttribute('aria-label', 'Delete task');
-    del.textContent = '✕';
-    del.addEventListener('click', () => removeTask(task.id, li));
+    var title = document.createElement('div');
+    title.className = 'task-title';
+    var tnm = document.createElement('span');
+    tnm.className = 'nm';
+    tnm.tabIndex = 0;
+    tnm.setAttribute('role', 'button');
+    tnm.title = 'Click to edit';
+    tnm.textContent = task.title;
+    function editTitle(){
+      startEdit(tnm, task.title, function(v){ task.title = v; save(); });
+    }
+    tnm.addEventListener('click', editTitle);
+    tnm.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); editTitle(); }
+    });
+    title.appendChild(tnm);
 
-    li.appendChild(checkbox);
+    var dod = document.createElement('div');
+    dod.className = 'dod' + (task.dod ? '' : ' empty');
+    var dnm = document.createElement('span');
+    dnm.className = 'nm';
+    dnm.tabIndex = 0;
+    dnm.setAttribute('role', 'button');
+    dnm.title = 'Click to edit';
+    if (task.dod){
+      dod.innerHTML = '<b>done when</b> · ';
+      dnm.textContent = task.dod;
+    } else {
+      dnm.textContent = '+ add a done-when';
+    }
+    function editDod(){
+      startEdit(dnm, task.dod, function(v){ task.dod = v; save(); }, 'done when…');
+    }
+    dnm.addEventListener('click', editDod);
+    dnm.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); editDod(); }
+    });
+    dod.appendChild(dnm);
+
+    text.appendChild(title);
+    text.appendChild(dod);
+
+    var kill = document.createElement('button');
+    kill.className = 'icon-btn';
+    kill.type = 'button';
+    kill.setAttribute('aria-label', 'Delete task ' + task.title);
+    kill.title = 'Delete task';
+    kill.textContent = '×';
+    kill.addEventListener('click', function(){
+      sys.tasks = sys.tasks.filter(function(t){ return t.id !== task.id; });
+      save(); render();
+    });
+
+    li.appendChild(box);
     li.appendChild(text);
-    li.appendChild(del);
+    li.appendChild(kill);
     return li;
   }
 
-  function toggleTask(id, checkboxEl, liEl){
-    const task = tasks.find(t => t.id === id);
-    if(!task) return;
+  /* ---------- interactions ---------- */
+  function toggle(goal, sys, task, li, box, card){
+    var sysWas = sysDone(sys);
+    var goalWas = goalDone(goal);
+    var allWas = goals.length > 0 && goals.every(goalDone);
+
     task.done = !task.done;
-    saveTasks();
+    li.classList.toggle('done', task.done);
+    box.setAttribute('aria-pressed', String(task.done));
+    box.setAttribute('aria-label', (task.done ? 'Untick: ' : 'Tick: ') + task.title);
+    if (task.done) burst(box);
+    save();
 
-    if(task.done){
-      liEl.classList.add('done');
-      spawnParticles(checkboxEl);
-      liEl.style.transform = 'scale(1.03)';
-      setTimeout(() => { liEl.style.transform = ''; }, 220);
-      if(tasks.length > 0 && tasks.every(t => t.done)){
-        celebrateAll();
-      }
-    } else {
-      liEl.classList.remove('done');
+    var st = statusOf(sys);
+    var dc = sys.tasks.filter(function(t){ return t.done; }).length;
+    var chip = card.querySelector('.chip');
+    chip.className = 'chip ' + st[0];
+    chip.textContent = st[1];
+    card.querySelector('.bar span').style.width =
+      (sys.tasks.length ? dc / sys.tasks.length * 100 : 0) + '%';
+    card.querySelector('.sys-tools .mono').textContent = dc + '/' + sys.tasks.length;
+    card.classList.toggle('is-done', st[0] === 'done');
+
+    updateSummaries(goal);
+
+    if (!sysWas && sysDone(sys)){
+      card.classList.add('sealing');
+      setTimeout(function(){ card.classList.remove('sealing'); }, 1300);
+    }
+    if (!goalWas && goalDone(goal)){
+      var allNow = goals.length > 0 && goals.every(goalDone);
+      setTimeout(function(){
+        celebrate(allNow && !allWas ? 'finale' : 'goal', goal.name);
+      }, 420);
     }
   }
 
-  function removeTask(id, liEl){
-    liEl.classList.add('removing');
-    setTimeout(() => {
-      tasks = tasks.filter(t => t.id !== id);
-      saveTasks();
-      render();
-    }, 260);
+  function updateSummaries(goal){
+    var t = tally(goal);
+    el('statSys').textContent = goal.systems.filter(sysDone).length;
+    el('statTask').textContent = t.done;
+    el('statTaskTotal').textContent = t.all;
+    ringArc.setAttribute('stroke-dashoffset', String(RING - RING * t.pct / 100));
+    ringArc.setAttribute('stroke', t.pct === 100 ? 'var(--mint)' : 'var(--pink)');
+    ringPct.textContent = t.pct + '%';
+    goalCard.classList.toggle('complete', goalDone(goal));
+    renderTabs();
   }
 
-  const PARTICLE_EMOJI = ['✨','💗','⭐','🌸','💫'];
-  function spawnParticles(anchorEl){
-    const count = 8;
-    for(let i = 0; i < count; i++){
-      const p = document.createElement('span');
-      p.className = 'particle';
-      p.textContent = PARTICLE_EMOJI[i % PARTICLE_EMOJI.length];
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
-      const dist = 30 + Math.random() * 18;
-      const dx = Math.cos(angle) * dist;
-      const dy = Math.sin(angle) * dist;
-      p.style.setProperty('--dx', dx + 'px');
-      p.style.setProperty('--dy', dy + 'px');
-      anchorEl.appendChild(p);
-      setTimeout(() => p.remove(), 750);
+  var SPARKS = ['✨','💗','⭐','🌸','💫'];
+  function burst(anchor){
+    if (reduced) return;
+    for (var i = 0; i < 7; i++){
+      var p = document.createElement('span');
+      p.className = 'spark';
+      p.textContent = SPARKS[i % SPARKS.length];
+      var a = (Math.PI * 2 * i) / 7 + Math.random() * 0.4;
+      var d = 26 + Math.random() * 16;
+      p.style.setProperty('--dx', Math.cos(a) * d + 'px');
+      p.style.setProperty('--dy', Math.sin(a) * d + 'px');
+      anchor.appendChild(p);
+      (function(node){ setTimeout(function(){ node.remove(); }, 760); })(p);
     }
   }
 
-  function celebrateAll(){
-    const overlay = document.createElement('div');
-    overlay.className = 'celebrate-overlay';
-    overlay.innerHTML = '<div class="celebrate-card">🎉 All done! You\'re amazing! 🎉</div>';
-    document.body.appendChild(overlay);
-    setTimeout(() => overlay.remove(), 2200);
+  function celebrate(kind, name){
+    var finale = kind === 'finale';
+    var t = document.createElement('div');
+    t.className = 'toast' + (finale ? ' finale' : '');
+    t.textContent = finale
+      ? '🏆 Every goal complete — the whole board is done!'
+      : '🎉 ' + name + ' — every system complete!';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 2700);
 
-    const confettiEmoji = ['🎉','✨','🌸','💗','⭐','🎀'];
-    for(let i = 0; i < 26; i++){
-      const c = document.createElement('span');
-      c.className = 'confetti-piece';
-      c.textContent = confettiEmoji[Math.floor(Math.random() * confettiEmoji.length)];
+    if (reduced) return;
+    var bits = finale
+      ? ['🏆','🎉','✨','🌸','💗','⭐','🎀','💫']
+      : ['🎉','✨','🌸','💗','⭐','🎀'];
+    var n = finale ? 60 : 30;
+    for (var i = 0; i < n; i++){
+      var c = document.createElement('span');
+      c.className = 'confetti';
+      c.textContent = bits[Math.floor(Math.random() * bits.length)];
       c.style.left = Math.random() * 100 + 'vw';
-      c.style.animationDuration = (1.6 + Math.random() * 1.2) + 's';
-      c.style.fontSize = (14 + Math.random() * 10) + 'px';
+      c.style.fontSize = (13 + Math.random() * (finale ? 16 : 11)) + 'px';
+      c.style.animationDuration = (1.7 + Math.random() * 1.3) + 's';
+      c.style.animationDelay = (Math.random() * (finale ? 0.7 : 0.25)) + 's';
       document.body.appendChild(c);
-      setTimeout(() => c.remove(), 3000);
+      (function(node){ setTimeout(function(){ node.remove(); }, 4200); })(c);
     }
   }
 
-  formEl.addEventListener('submit', function(e){
-    e.preventDefault();
-    const value = inputEl.value.trim();
-    if(!value) return;
-    if(tasks.length >= MAX_TASKS) return;
+  function addGoal(){
+    if (goals.length >= MAX_GOALS) return;
+    goals.push({ id: nid(), name: 'New goal', systems: [] });
+    sel = goals.length - 1;
+    save(); render();
+    goalTitleEl.click();
+  }
 
-    tasks.push({ id: uid(), text: value, done: false });
-    saveTasks();
-    inputEl.value = '';
-    render();
+  addSysBtn.addEventListener('click', function(){
+    var g = goals[sel];
+    if (!g || g.systems.length >= MAX_SYSTEMS) return;
+    g.systems.push({ id: nid(), name: 'New system', open: true, tasks: [] });
+    save(); render();
+    var first = systemsEl.querySelector('.sys .nm');
+    if (first) first.click();
   });
 
+  el('firstGoal').addEventListener('click', addGoal);
+
+  el('goalKill').addEventListener('click', function(){
+    if (!goals.length) return;
+    goals.splice(sel, 1);
+    if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
+    save(); render();
+  });
+
+  goalTitleEl.addEventListener('click', function(){
+    var g = goals[sel];
+    if (!g) return;
+    startEdit(goalTitleEl, g.name, function(v){ g.name = v; save(); });
+  });
+  goalTitleEl.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      goalTitleEl.click();
+    }
+  });
+
+  function render(){ renderTabs(); renderGoal(); }
+
+  /* ---------- boot ---------- */
+  var saved = load();
+  if (saved && saved.goals.length){
+    goals = saved.goals;
+    sel = Math.min(Math.max(0, saved.sel), goals.length - 1);
+  } else {
+    goals = [];
+    sel = 0;
+  }
   render();
 })();
 </script>

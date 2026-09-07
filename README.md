@@ -4,7 +4,9 @@ Small, self-contained web apps for personal use. Each app lives in its own top-l
 
 ## Apps
 
-- [`todo-list/`](./todo-list) — Cute 10-task to-do list with completion animations.
+- [`todo-list/`](./todo-list) — Cute to-do list built as a work breakdown: up to
+  4 goals, 4 systems per goal, 4 tasks per system. Progress is computed upward
+  from the task checkboxes, never set by hand. Saved to `localStorage`.
 
 ## Layout
 
