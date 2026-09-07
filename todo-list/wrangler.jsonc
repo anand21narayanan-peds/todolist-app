@@ -1,5 +1,7 @@
 {
-  "name": "smallapps",
+  // Must match the Worker's name in the Cloudflare dashboard exactly,
+  // or `wrangler deploy` targets a different Worker and the Git link breaks.
+  "name": "todolist-app",
   "compatibility_date": "2025-01-01",
   "assets": {
     "directory": "./public"
