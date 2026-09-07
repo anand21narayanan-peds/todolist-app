@@ -1,41 +1,59 @@
-# smallapps
+# todolist-app
 
-Small, self-contained web apps for personal use. Each app lives in its own top-level folder as a static site (plain HTML/CSS/JS, no build step) so it can be deployed independently.
+A cute to-do list built as a work breakdown rather than a flat list: up to
+**4 goals**, **4 systems** per goal, and **4 tasks** per system — a ceiling of 64.
 
-## Apps
+Nothing above task level is ever ticked by hand. A system completes when all its
+tasks do, a goal when all its systems do, so progress is computed upward from the
+checkboxes. Each task can carry a `done when` clause, which makes "finished" a
+fact rather than a feeling.
 
-- [`todo-list/`](./todo-list) — Cute to-do list built as a work breakdown: up to
-  4 goals, 4 systems per goal, 4 tasks per system. Progress is computed upward
-  from the task checkboxes, never set by hand. Saved to `localStorage`.
+Plain HTML/CSS/JS in a single file — no build step, no dependencies. Boards are
+saved to `localStorage` in the visitor's own browser.
 
 ## Layout
 
-Each app is one top-level folder holding its own `wrangler.jsonc`, and serves
-static files from a `public/` subfolder:
-
 ```
-todo-list/
-  wrangler.jsonc   # worker name + assets config
-  package.json     # present so the build's install step has something to run
-  public/
-    index.html     # everything served publicly lives here
+wrangler.jsonc   # worker name + assets config
+package.json     # present so the build's install step has something to run
+public/
+  index.html     # everything served publicly lives here
 ```
 
-Keeping the served files in `public/` matters: if `assets.directory` points at
-the app folder itself, `wrangler.jsonc`, `package.json`, and anything npm
-generates during the build all get published as public assets too.
+Two things about this layout are deliberate:
+
+- **The config lives at the repo root**, so `wrangler deploy` finds it without
+  Cloudflare needing a "root directory" build setting. One less dashboard field
+  to get wrong.
+- **Served files live in `public/`**, not at the root. If `assets.directory`
+  pointed at the root, `wrangler.jsonc`, `package.json`, and anything npm
+  generates during the build would all be published as public assets too.
 
 ## Deploying to Cloudflare (Workers Builds)
 
-One Cloudflare Worker per app, all from this single repo:
-
 1. Cloudflare dashboard → **Workers & Pages → Create → Import a repository**, pick this repo.
-2. **Root directory**: the app's folder, e.g. `todo-list`.
+2. **Worker name**: must exactly match `name` in `wrangler.jsonc` (`todolist-app`).
+   A mismatch deploys to a different Worker and breaks the Git connection.
 3. **Build command**: leave empty. **Deploy command**: `npx wrangler deploy`.
-4. **Production branch**: the branch the app's folder actually exists on.
-5. In the app's `wrangler.jsonc`, `name` must exactly match the Worker's name in
-   the dashboard, or the deploy targets the wrong Worker and the Git connection
-   breaks.
+4. **Root directory**: leave empty — the config is at the repo root.
+5. **Production branch**: `main`.
+6. **API token**: needs Workers permissions — the "Edit Cloudflare Workers"
+   template works. A token scoped to something else fails with a permissions note.
 
-Adding a new app later means a new top-level folder (with its own
-`wrangler.jsonc` and `public/`) and one more Worker pointed at it.
+## Developing
+
+There is nothing to install or build. Open `public/index.html` in a browser, or
+serve the folder:
+
+```sh
+python3 -m http.server -d public 8000
+```
+
+To check a change deploys before pushing:
+
+```sh
+npx wrangler deploy --dry-run
+```
+
+It should report reading exactly **1 file** from `public`. A higher count means
+config files are leaking into the published assets.
