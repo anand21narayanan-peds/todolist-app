@@ -66,26 +66,42 @@ rate limiting. Use a long password.
 
 ## First-time setup
 
-You need this once, from a machine with the repo checked out:
+From a checkout, with the repo's Cloudflare account:
+
+```sh
+npm run setup
+```
+
+That signs you in if needed, creates the `todolist-db` database, writes its id
+into `wrangler.jsonc`, creates the tables, and asks for a password. It is safe
+to re-run — every step checks for what already exists first.
+
+Then commit the id it wrote, so the Git build uses the same database:
+
+```sh
+git add wrangler.jsonc && git commit -m "Point at the D1 database" && git push
+```
+
+<details>
+<summary>Doing it by hand instead</summary>
 
 ```sh
 npx wrangler login
-
-# 1. create the database, then paste the printed id into wrangler.jsonc
-npx wrangler d1 create todolist-db
-
-# 2. create the tables
+npx wrangler d1 create todolist-db          # copy the printed id
+node scripts/set-db-id.mjs <that-id>        # or edit wrangler.jsonc yourself
 npx wrangler d1 execute todolist-db --remote --file=./schema.sql
-
-# 3. choose a password and store its verifier as a secret
-node scripts/hash-password.mjs
-npx wrangler secret put APP_PASSWORD_HASH
+node scripts/hash-password.mjs              # choose a password
+npx wrangler secret put APP_PASSWORD_HASH   # paste the printed verifier
 ```
+</details>
 
-Until `database_id` is filled in and the secret is set, the API answers `503`
-with a message saying which piece is missing.
+Until `database_id` is a real id, **`wrangler deploy` fails** — the placeholder
+in a fresh checkout is deliberate, so a misconfigured deploy is loud rather than
+silently writing nowhere. Until the secret is set, the API answers `503` with a
+message naming what is missing.
 
-To change the password later, re-run step 3. Every device is signed out.
+To change the password later, run `npm run password` and
+`npx wrangler secret put APP_PASSWORD_HASH`. Every device is signed out.
 
 ## Deploying to Cloudflare (Workers Builds)
 

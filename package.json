@@ -1,5 +1,14 @@
 {
-  "name": "cute-todo-list",
+  "name": "todolist-app",
   "private": true,
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run",
+    "db:local": "wrangler d1 execute todolist-db --local --file=./schema.sql",
+    "db:remote": "wrangler d1 execute todolist-db --remote --file=./schema.sql",
+    "password": "node scripts/hash-password.mjs"
+  }
 }
