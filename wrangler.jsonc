@@ -1,28 +1,11 @@
 {
-  // Must match the Worker's name in the Cloudflare dashboard exactly,
-  // or `wrangler deploy` targets a different Worker and the Git link breaks.
+  // Must match the Worker's name in the Cloudflare dashboard exactly.
   "name": "todolist-app",
-  "main": "src/index.js",
   "compatibility_date": "2025-01-01",
 
+  // Static files only. The app talks to Supabase directly from the browser,
+  // so there is no Worker code, no database binding and no server secret here.
   "assets": {
-    "directory": "./public",
-    // Named binding so the Worker can hand non-/api/ requests to the
-    // static files. Assets are matched before the Worker runs, so /
-    // serves index.html directly and only /api/* reaches the code.
-    "binding": "ASSETS"
-  },
-
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "todolist-db",
-      // Not a secret — it only names the database; using it still requires
-      // account auth. `npx wrangler d1 list` prints it again if needed.
-      "database_id": "fe93f92d-7010-47d3-86ff-1800db194c78"
-    }
-  ]
-
-  // The password verifier is a secret, not a var — never put it here:
-  //   npx wrangler secret put APP_PASSWORD_HASH
+    "directory": "./public"
+  }
 }

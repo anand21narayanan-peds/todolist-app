@@ -444,6 +444,17 @@
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 11.5px; color: var(--pink); min-height: 16px; margin: 0;
   }
+  .gate-err.ok{ color: var(--mint); }
+  .gate-hint{ margin: 0; }
+  .setup{
+    background: var(--peach-wash); border: 1.5px solid color-mix(in srgb, var(--peach) 40%, var(--rule));
+    border-radius: 14px; padding: 14px 16px; text-align: left;
+    font-size: 13.5px; color: var(--ink);
+  }
+  .setup code{
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px;
+    background: var(--card-sunk); padding: 1px 5px; border-radius: 5px;
+  }
 
   /* ---------- sync status ---------- */
   .topbar{ display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
@@ -494,11 +505,16 @@
     <h2>Cute To-Do</h2>
     <p>Sign in to reach your board from any device.</p>
     <form id="loginForm">
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="username"
+             aria-label="Email" required />
       <input type="password" id="password" placeholder="Password" autocomplete="current-password"
              aria-label="Password" required />
       <button class="btn" type="submit" id="loginBtn">Sign in</button>
     </form>
     <p class="gate-err" id="loginErr" role="alert"></p>
+    <p class="gate-hint" id="resetRow">
+      <button class="linkish" id="forgot" type="button">Forgot your password?</button>
+    </p>
   </div>
 </div>
 
@@ -567,729 +583,849 @@
   </p>
 </div>
 
-<script>
-(function(){
-  'use strict';
+<script src="config.js"></script>
+<script type="module">
+/*
+  Loaded dynamically rather than with a static import: a static import that
+  fails aborts the whole module, and the page would render blank with nothing
+  explaining why. window.SUPABASE_LIB lets a test point this at a local stub.
+*/
+const SUPABASE_LIB = window.SUPABASE_LIB ||
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm';
 
-  var MAX_GOALS = 4, MAX_SYSTEMS = 4, MAX_TASKS = 4;
-  var RING = 220, TABRING = 69;
-  var LEGACY_KEY = 'cute-systems-todo-v1';
+const MAX_GOALS = 4, MAX_SYSTEMS = 4, MAX_TASKS = 4;
+const RING = 220, TABRING = 69;
+const LEGACY_KEY = 'cute-systems-todo-v1';
 
-  /* Server-owned state. `open` is a Set of expanded system ids. */
-  var goals = [];
-  var sel = 0;
-  var open = new Set();
-  var booted = false;
+const el = id => document.getElementById(id);
+const tabsEl = el('tabs'), systemsEl = el('systems'), goalCard = el('goalCard');
+const ringArc = el('ringArc'), ringPct = el('ringPct');
+const addSysBtn = el('addSys'), addSysRow = el('addSysRow');
+const sysCapEl = el('sysCap'), goalCapEl = el('goalCap');
+const noGoals = el('noGoals'), goalTitleEl = el('goalTitle');
+const gate = el('gate'), app = el('app');
+const syncEl = el('sync'), syncText = el('syncText');
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  var el = function(id){ return document.getElementById(id); };
-  var tabsEl = el('tabs'), systemsEl = el('systems'), goalCard = el('goalCard');
-  var ringArc = el('ringArc'), ringPct = el('ringPct');
-  var addSysBtn = el('addSys'), addSysRow = el('addSysRow');
-  var sysCapEl = el('sysCap'), goalCapEl = el('goalCap');
-  var noGoals = el('noGoals'), goalTitleEl = el('goalTitle');
-  var gate = el('gate'), app = el('app');
-  var syncEl = el('sync'), syncText = el('syncText');
-  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let goals = [];
+let sel = 0;
+let open = new Set();
+let uid = null;
+let booted = false;
 
-  /* ------------------------------------------------------------ transport */
+/* ------------------------------------------------------------------ client */
 
-  var inFlight = 0;
-  function setSync(kind, text){
-    syncEl.className = 'sync' + (kind ? ' ' + kind : '');
-    syncText.textContent = text;
+const configured =
+  window.SUPABASE_URL && window.SUPABASE_ANON_KEY &&
+  !String(window.SUPABASE_URL).startsWith('REPLACE_') &&
+  !String(window.SUPABASE_ANON_KEY).startsWith('REPLACE_');
+
+let sb = null;   // assigned in boot(), once the library has actually loaded
+
+/* ------------------------------------------------------------------- sync UI */
+
+let busy = 0;
+function setSync(kind, text){
+  syncEl.className = 'sync' + (kind ? ' ' + kind : '');
+  syncText.textContent = text;
+}
+function begin(){ busy++; if (busy === 1) setSync('saving', 'Saving…'); }
+function end(){ busy--; if (busy <= 0){ busy = 0; setSync('', 'Synced'); } }
+
+/** Every Supabase call goes through here so errors surface the same way. */
+async function run(promise){
+  begin();
+  try {
+    const { data, error } = await promise;
+    if (error) throw error;
+    return data;
+  } finally { end(); }
+}
+
+function fail(err){
+  const msg = (err && (err.message || err.error_description)) || 'Something went wrong.';
+  setSync('error', "Couldn't save");
+  say(msg);
+  setTimeout(() => { if (busy === 0) setSync('', 'Synced'); }, 3200);
+}
+
+/* --------------------------------------------------------------- derived */
+
+const sysDone  = s => s.tasks.length > 0 && s.tasks.every(t => t.done);
+const goalDone = g => g.systems.length > 0 && g.systems.every(sysDone);
+function tally(g){
+  let all = 0, done = 0;
+  g.systems.forEach(s => { all += s.tasks.length; done += s.tasks.filter(t => t.done).length; });
+  return { all, done, pct: all ? Math.round(done / all * 100) : 0 };
+}
+function statusOf(s){
+  if (!s.tasks.length) return ['todo', 'Not started'];
+  if (s.tasks.every(t => t.done)) return ['done', 'Complete'];
+  if (s.tasks.some(t => t.done))  return ['wip', 'In progress'];
+  return ['todo', 'Not started'];
+}
+
+/* ------------------------------------------------------------- data layer */
+
+async function fetchBoard(){
+  const [g, s, t, p] = await Promise.all([
+    sb.from('goals').select('id,name,position').order('position'),
+    sb.from('systems').select('id,goal_id,name,position').order('position'),
+    sb.from('tasks').select('id,system_id,title,dod,done,position').order('position'),
+    sb.from('prefs').select('sel,open').maybeSingle()
+  ]);
+  for (const r of [g, s, t, p]) if (r.error) throw r.error;
+
+  const byS = new Map();
+  for (const row of t.data) {
+    if (!byS.has(row.system_id)) byS.set(row.system_id, []);
+    byS.get(row.system_id).push({ id: row.id, title: row.title, dod: row.dod, done: !!row.done });
+  }
+  const byG = new Map();
+  for (const row of s.data) {
+    if (!byG.has(row.goal_id)) byG.set(row.goal_id, []);
+    byG.get(row.goal_id).push({ id: row.id, name: row.name, tasks: byS.get(row.id) || [] });
   }
 
-  function api(path, method, body){
-    inFlight++;
-    if (inFlight === 1) setSync('saving', 'Saving…');
-    var opts = { method: method || 'GET', credentials: 'same-origin', headers: {} };
-    if (body !== undefined){
-      opts.headers['content-type'] = 'application/json';
-      opts.body = JSON.stringify(body);
-    }
-    return fetch(path, opts).then(function(res){
-      return res.json().catch(function(){ return {}; }).then(function(data){
-        if (res.status === 401 && path !== '/api/login'){
-          showGate();
-          throw new Error('Signed out');
-        }
-        if (!res.ok) throw new Error(data.error || 'Request failed');
-        return data;
-      });
-    }).finally(function(){
-      inFlight--;
-      if (inFlight === 0) setSync('', 'Synced');
-    });
+  goals = g.data.map(row => ({ id: row.id, name: row.name, systems: byG.get(row.id) || [] }));
+  if (p.data) {
+    sel = Number.isInteger(p.data.sel) ? p.data.sel : 0;
+    open = new Set(Array.isArray(p.data.open) ? p.data.open : []);
   }
+  if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
+}
 
-  /** Any mutation returns the whole board; adopt it and repaint. */
-  function adopt(data, keepDom){
-    if (!data || !Array.isArray(data.goals)) return;
-    goals = data.goals;
-    if (data.ui){
-      if (Number.isInteger(data.ui.sel)) sel = data.ui.sel;
-      if (Array.isArray(data.ui.open)) open = new Set(data.ui.open);
-    }
-    if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
-    if (!keepDom) render();
+async function reload(keepDom){
+  begin();
+  try { await fetchBoard(); if (!keepDom) render(); }
+  finally { end(); }
+}
+
+let uiTimer = null;
+function saveUi(){
+  clearTimeout(uiTimer);
+  uiTimer = setTimeout(() => {
+    sb.from('prefs')
+      .upsert({ user_id: uid, sel, open: Array.from(open) }, { onConflict: 'user_id' })
+      .then(({ error }) => { if (error) console.warn('prefs', error.message); });
+  }, 500);
+}
+
+/* --------------------------------------------------------- inline renaming */
+
+function startEdit(node, current, commit, placeholder){
+  if (node.dataset.editing === '1') return;
+  node.dataset.editing = '1';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'edit';
+  input.value = current;
+  input.maxLength = 80;
+  if (placeholder) input.placeholder = placeholder;
+  node.textContent = '';
+  node.appendChild(input);
+  input.focus();
+  input.select();
+
+  let settled = false;
+  function finish(keep){
+    if (settled) return;
+    settled = true;
+    node.dataset.editing = '0';
+    const v = input.value.trim();
+    if (keep && v && v !== current) commit(v);
+    else render();
   }
+  // The input sits inside a .nm node that handles Enter/Space itself. Without
+  // stopPropagation, Space is preventDefault()ed (untypeable) and Enter
+  // reopens the editor it just closed.
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('click', e => e.stopPropagation());
+}
 
-  function fail(err){
-    if (!err || err.message === 'Signed out') return;
-    setSync('error', "Couldn't save");
-    say(err.message || 'Something went wrong.');
-    setTimeout(function(){ if (inFlight === 0) setSync('', 'Synced'); }, 3200);
-  }
+/* ------------------------------------------------------------------ render */
 
-  /* --------------------------------------------------------------- derived */
+function renderTabs(){
+  tabsEl.textContent = '';
+  goals.forEach((g, i) => {
+    const t = tally(g), complete = goalDone(g);
+    const b = document.createElement('button');
+    b.className = 'tab' + (complete ? ' complete' : '');
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(i === sel));
 
-  function sysDone(s){ return s.tasks.length > 0 && s.tasks.every(function(t){ return t.done; }); }
-  function goalDone(g){ return g.systems.length > 0 && g.systems.every(sysDone); }
-  function tally(g){
-    var all = 0, done = 0;
-    g.systems.forEach(function(s){
-      all += s.tasks.length;
-      done += s.tasks.filter(function(t){ return t.done; }).length;
-    });
-    return { all: all, done: done, pct: all ? Math.round(done / all * 100) : 0 };
-  }
-  function statusOf(s){
-    if (!s.tasks.length) return ['todo', 'Not started'];
-    if (s.tasks.every(function(t){ return t.done; })) return ['done', 'Complete'];
-    if (s.tasks.some(function(t){ return t.done; }))  return ['wip', 'In progress'];
-    return ['todo', 'Not started'];
-  }
+    const ring = document.createElement('span');
+    ring.className = 'tab-ring';
+    ring.innerHTML =
+      '<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">' +
+        '<circle cx="13" cy="13" r="11" fill="none" stroke="var(--ground-tint)" stroke-width="4"></circle>' +
+        '<circle cx="13" cy="13" r="11" fill="none" stroke="' + (complete ? 'var(--mint)' : 'var(--pink)') +
+        '" stroke-width="4" stroke-linecap="round" stroke-dasharray="' + TABRING +
+        '" stroke-dashoffset="' + (TABRING - TABRING * t.pct / 100) + '"></circle>' +
+      '</svg>';
 
-  /* ------------------------------------------------------- UI-state saving */
+    const txt = document.createElement('span');
+    txt.className = 'tab-txt';
+    const nm = document.createElement('span');
+    nm.className = 'tab-name';
+    nm.textContent = g.name;
+    const meta = document.createElement('span');
+    meta.className = 'tab-meta';
+    meta.textContent = t.done + '/' + t.all + ' tasks';
+    txt.append(nm, meta);
 
-  var uiTimer = null;
-  function saveUi(){
-    clearTimeout(uiTimer);
-    uiTimer = setTimeout(function(){
-      api('/api/ui', 'PUT', { sel: sel, open: Array.from(open) }).catch(function(){});
-    }, 400);
-  }
-
-  /* ------------------------------------------------------- inline renaming */
-
-  function startEdit(node, current, commit, placeholder){
-    if (node.dataset.editing === '1') return;
-    node.dataset.editing = '1';
-    var input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'edit';
-    input.value = current;
-    input.maxLength = 80;
-    if (placeholder) input.placeholder = placeholder;
-    node.textContent = '';
-    node.appendChild(input);
-    input.focus();
-    input.select();
-
-    var settled = false;
-    function finish(keep){
-      if (settled) return;
-      settled = true;
-      node.dataset.editing = '0';
-      var v = input.value.trim();
-      if (keep && v && v !== current) commit(v);
-      else render();
-    }
-    // The input sits inside a .nm node that handles Enter/Space itself.
-    // Without stopPropagation, Space is preventDefault()ed (untypeable) and
-    // Enter reopens the editor it just closed.
-    input.addEventListener('keydown', function(e){
-      e.stopPropagation();
-      if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
-    });
-    input.addEventListener('blur', function(){ finish(true); });
-    input.addEventListener('click', function(e){ e.stopPropagation(); });
-  }
-
-  /* ---------------------------------------------------------------- render */
-
-  function renderTabs(){
-    tabsEl.textContent = '';
-    goals.forEach(function(g, i){
-      var t = tally(g), complete = goalDone(g);
-      var b = document.createElement('button');
-      b.className = 'tab' + (complete ? ' complete' : '');
-      b.type = 'button';
-      b.setAttribute('role', 'tab');
-      b.setAttribute('aria-selected', String(i === sel));
-
-      var ring = document.createElement('span');
-      ring.className = 'tab-ring';
-      ring.innerHTML =
-        '<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">' +
-          '<circle cx="13" cy="13" r="11" fill="none" stroke="var(--ground-tint)" stroke-width="4"></circle>' +
-          '<circle cx="13" cy="13" r="11" fill="none" stroke="' + (complete ? 'var(--mint)' : 'var(--pink)') +
-          '" stroke-width="4" stroke-linecap="round" stroke-dasharray="' + TABRING +
-          '" stroke-dashoffset="' + (TABRING - TABRING * t.pct / 100) + '"></circle>' +
-        '</svg>';
-
-      var txt = document.createElement('span');
-      txt.className = 'tab-txt';
-      var nm = document.createElement('span');
-      nm.className = 'tab-name';
-      nm.textContent = g.name;
-      var meta = document.createElement('span');
-      meta.className = 'tab-meta';
-      meta.textContent = t.done + '/' + t.all + ' tasks';
-      txt.appendChild(nm);
-      txt.appendChild(meta);
-
-      b.appendChild(ring);
-      b.appendChild(txt);
-      b.addEventListener('click', function(){ sel = i; saveUi(); render(); });
-      tabsEl.appendChild(b);
-    });
-
-    if (goals.length < MAX_GOALS){
-      var add = document.createElement('button');
-      add.className = 'tab add';
-      add.type = 'button';
-      add.textContent = '+ Add goal';
-      add.addEventListener('click', addGoal);
-      tabsEl.appendChild(add);
-    }
-
-    goalCapEl.textContent = goals.length + ' / ' + MAX_GOALS + ' goals' +
-      (goals.length >= MAX_GOALS ? ' — ceiling reached' : '');
-  }
-
-  function renderGoal(){
-    var g = goals[sel];
-    var has = !!g;
-    goalCard.hidden = !has;
-    addSysRow.hidden = !has;
-    noGoals.hidden = has;
-    systemsEl.textContent = '';
-    if (!has) return;
-
-    goalTitleEl.textContent = g.name;
-    el('goalLabel').textContent = 'Goal ' + (sel + 1) + ' of ' + goals.length;
-    goalCard.classList.toggle('complete', goalDone(g));
-
-    var t = tally(g);
-    el('statSys').textContent = g.systems.filter(sysDone).length;
-    el('statSysTotal').textContent = g.systems.length;
-    el('statTask').textContent = t.done;
-    el('statTaskTotal').textContent = t.all;
-    ringArc.setAttribute('stroke-dashoffset', String(RING - RING * t.pct / 100));
-    ringArc.setAttribute('stroke', t.pct === 100 ? 'var(--mint)' : 'var(--pink)');
-    ringPct.textContent = t.pct + '%';
-
-    if (!g.systems.length){
-      var e = document.createElement('div');
-      e.className = 'empty';
-      e.innerHTML =
-        '<span class="emo">🧩</span>' +
-        '<strong>No systems yet</strong>' +
-        '<p>Break this goal into the areas it is really made of. Four at most — if you need a fifth, two of them are probably the same thing.</p>';
-      systemsEl.appendChild(e);
-    } else {
-      g.systems.forEach(function(sys, i){ systemsEl.appendChild(buildSystem(g, sys, i)); });
-    }
-
-    addSysBtn.disabled = g.systems.length >= MAX_SYSTEMS;
-    sysCapEl.textContent = g.systems.length + ' / ' + MAX_SYSTEMS + ' systems in this goal' +
-      (g.systems.length >= MAX_SYSTEMS ? ' — ceiling reached' : '');
-  }
-
-  function buildSystem(goal, sys, i){
-    var st = statusOf(sys), cls = st[0], label = st[1];
-    var dc = sys.tasks.filter(function(t){ return t.done; }).length;
-    var pct = sys.tasks.length ? Math.round(dc / sys.tasks.length * 100) : 0;
-    var isOpen = open.has(sys.id);
-
-    var card = document.createElement('article');
-    card.className = 'sys' + (isOpen ? ' open' : '') + (cls === 'done' ? ' is-done' : '');
-
-    var seal = document.createElement('div');
-    seal.className = 'seal';
-    seal.textContent = 'SYSTEM COMPLETE';
-    card.appendChild(seal);
-
-    var head = document.createElement('div');
-    head.className = 'sys-head';
-
-    var code = document.createElement('span');
-    code.className = 'sys-code';
-    code.textContent = 'SYS-0' + (i + 1);
-
-    var main = document.createElement('div');
-    main.className = 'sys-main';
-
-    var nameRow = document.createElement('div');
-    nameRow.className = 'sys-name';
-    var nm = document.createElement('span');
-    nm.className = 'nm';
-    nm.tabIndex = 0;
-    nm.setAttribute('role', 'button');
-    nm.title = 'Click to rename';
-    nm.textContent = sys.name;
-    function renameSys(){
-      startEdit(nm, sys.name, function(v){
-        api('/api/systems/' + sys.id, 'PATCH', { name: v }).then(adopt).catch(fail);
-      });
-    }
-    nm.addEventListener('click', function(e){ e.stopPropagation(); renameSys(); });
-    nm.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); renameSys(); }
-    });
-    var chip = document.createElement('span');
-    chip.className = 'chip ' + cls;
-    chip.textContent = label;
-    nameRow.appendChild(nm);
-    nameRow.appendChild(chip);
-
-    var bar = document.createElement('div');
-    bar.className = 'bar';
-    var fill = document.createElement('span');
-    fill.style.width = pct + '%';
-    bar.appendChild(fill);
-
-    main.appendChild(nameRow);
-    main.appendChild(bar);
-
-    var tools = document.createElement('div');
-    tools.className = 'sys-tools';
-    var count = document.createElement('span');
-    count.className = 'mono';
-    count.textContent = dc + '/' + sys.tasks.length;
-
-    var toggleBtn = document.createElement('button');
-    toggleBtn.className = 'icon-btn';
-    toggleBtn.type = 'button';
-    toggleBtn.setAttribute('aria-expanded', String(isOpen));
-    toggleBtn.setAttribute('aria-label', (isOpen ? 'Collapse ' : 'Expand ') + sys.name);
-    toggleBtn.innerHTML = '<svg class="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" ' +
-      'stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" ' +
-      'aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-
-    var killSys = document.createElement('button');
-    killSys.className = 'icon-btn';
-    killSys.type = 'button';
-    killSys.setAttribute('aria-label', 'Delete system ' + sys.name);
-    killSys.title = 'Delete system';
-    killSys.textContent = '×';
-    killSys.addEventListener('click', function(e){
-      e.stopPropagation();
-      open.delete(sys.id);
-      api('/api/systems/' + sys.id, 'DELETE').then(adopt).catch(fail);
-    });
-
-    tools.appendChild(count);
-    tools.appendChild(toggleBtn);
-    tools.appendChild(killSys);
-
-    head.appendChild(code);
-    head.appendChild(main);
-    head.appendChild(tools);
-    head.addEventListener('click', function(){
-      if (open.has(sys.id)) open.delete(sys.id); else open.add(sys.id);
-      saveUi();
-      render();
-    });
-    card.appendChild(head);
-
-    var body = document.createElement('div');
-    body.className = 'sys-body';
-
-    if (sys.tasks.length){
-      var list = document.createElement('ul');
-      list.className = 'tasks';
-      sys.tasks.forEach(function(task){ list.appendChild(buildTask(goal, sys, task, card)); });
-      body.appendChild(list);
-    } else {
-      var te = document.createElement('div');
-      te.className = 'task-empty';
-      te.textContent = 'No tasks yet — an empty system never counts as done.';
-      body.appendChild(te);
-    }
-
-    if (sys.tasks.length < MAX_TASKS){
-      var row = document.createElement('div');
-      row.className = 'addrow';
-      var tIn = document.createElement('input');
-      tIn.type = 'text';
-      tIn.placeholder = 'New task…';
-      tIn.maxLength = 90;
-      var dIn = document.createElement('input');
-      dIn.type = 'text';
-      dIn.className = 'dod-in';
-      dIn.placeholder = 'done when… (optional)';
-      dIn.maxLength = 110;
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn';
-      btn.textContent = 'Add';
-
-      var submit = function(){
-        var v = tIn.value.trim();
-        if (!v) return;
-        btn.disabled = true;
-        open.add(sys.id);
-        api('/api/systems/' + sys.id + '/tasks', 'POST', { title: v, dod: dIn.value.trim() })
-          .then(adopt).catch(fail);
-      };
-      btn.addEventListener('click', submit);
-      var onKey = function(e){ if (e.key === 'Enter'){ e.preventDefault(); submit(); } };
-      tIn.addEventListener('keydown', onKey);
-      dIn.addEventListener('keydown', onKey);
-
-      row.appendChild(tIn);
-      row.appendChild(dIn);
-      row.appendChild(btn);
-      body.appendChild(row);
-    } else {
-      var note = document.createElement('div');
-      note.className = 'cap-note';
-      note.textContent = 'System full at ' + MAX_TASKS + ' tasks — finish one, or split the system.';
-      body.appendChild(note);
-    }
-
-    card.appendChild(body);
-    return card;
-  }
-
-  function buildTask(goal, sys, task, card){
-    var li = document.createElement('li');
-    li.className = 'task' + (task.done ? ' done' : '');
-
-    var box = document.createElement('button');
-    box.className = 'box';
-    box.type = 'button';
-    box.setAttribute('aria-pressed', String(!!task.done));
-    box.setAttribute('aria-label', (task.done ? 'Untick: ' : 'Tick: ') + task.title);
-    box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" ' +
-      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<polyline points="20 6 9 17 4 12"></polyline></svg>';
-    box.addEventListener('click', function(){ toggleTask(goal, sys, task, li, box, card); });
-
-    var text = document.createElement('div');
-    text.className = 'task-text';
-
-    var title = document.createElement('div');
-    title.className = 'task-title';
-    var tnm = document.createElement('span');
-    tnm.className = 'nm';
-    tnm.tabIndex = 0;
-    tnm.setAttribute('role', 'button');
-    tnm.title = 'Click to edit';
-    tnm.textContent = task.title;
-    function editTitle(){
-      startEdit(tnm, task.title, function(v){
-        api('/api/tasks/' + task.id, 'PATCH', { title: v }).then(adopt).catch(fail);
-      });
-    }
-    tnm.addEventListener('click', editTitle);
-    tnm.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); editTitle(); }
-    });
-    title.appendChild(tnm);
-
-    var dod = document.createElement('div');
-    dod.className = 'dod' + (task.dod ? '' : ' empty');
-    var dnm = document.createElement('span');
-    dnm.className = 'nm';
-    dnm.tabIndex = 0;
-    dnm.setAttribute('role', 'button');
-    dnm.title = 'Click to edit';
-    if (task.dod){
-      dod.innerHTML = '<b>done when</b> · ';
-      dnm.textContent = task.dod;
-    } else {
-      dnm.textContent = '+ add a done-when';
-    }
-    function editDod(){
-      startEdit(dnm, task.dod, function(v){
-        api('/api/tasks/' + task.id, 'PATCH', { dod: v }).then(adopt).catch(fail);
-      }, 'done when…');
-    }
-    dnm.addEventListener('click', editDod);
-    dnm.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); editDod(); }
-    });
-    dod.appendChild(dnm);
-
-    text.appendChild(title);
-    text.appendChild(dod);
-
-    var kill = document.createElement('button');
-    kill.className = 'icon-btn';
-    kill.type = 'button';
-    kill.setAttribute('aria-label', 'Delete task ' + task.title);
-    kill.title = 'Delete task';
-    kill.textContent = '×';
-    kill.addEventListener('click', function(){
-      api('/api/tasks/' + task.id, 'DELETE').then(adopt).catch(fail);
-    });
-
-    li.appendChild(box);
-    li.appendChild(text);
-    li.appendChild(kill);
-    return li;
-  }
-
-  /* ---------------------------------------------------------- interactions */
-
-  function toggleTask(goal, sys, task, li, box, card){
-    var sysWas = sysDone(sys);
-    var goalWas = goalDone(goal);
-    var allWas = goals.length > 0 && goals.every(goalDone);
-    var prev = task.done;
-
-    // Optimistic: the animation has to fire on the click, not a round trip
-    // later, and a full re-render would destroy the card mid-animation.
-    task.done = !prev;
-    li.classList.toggle('done', task.done);
-    box.setAttribute('aria-pressed', String(task.done));
-    box.setAttribute('aria-label', (task.done ? 'Untick: ' : 'Tick: ') + task.title);
-    if (task.done) burst(box);
-    paintSystem(sys, card);
-    updateSummaries(goal);
-
-    if (!sysWas && sysDone(sys)){
-      card.classList.add('sealing');
-      setTimeout(function(){ card.classList.remove('sealing'); }, 1300);
-    }
-    if (!goalWas && goalDone(goal)){
-      var allNow = goals.length > 0 && goals.every(goalDone);
-      setTimeout(function(){ celebrate(allNow && !allWas ? 'finale' : 'goal', goal.name); }, 420);
-    }
-
-    api('/api/tasks/' + task.id, 'PATCH', { done: task.done })
-      .then(function(data){ adopt(data, true); })   // keep the DOM we just animated
-      .catch(function(err){
-        task.done = prev;                            // put it back
-        render();
-        fail(err);
-      });
-  }
-
-  function paintSystem(sys, card){
-    var st = statusOf(sys);
-    var dc = sys.tasks.filter(function(t){ return t.done; }).length;
-    var chip = card.querySelector('.chip');
-    chip.className = 'chip ' + st[0];
-    chip.textContent = st[1];
-    card.querySelector('.bar span').style.width =
-      (sys.tasks.length ? dc / sys.tasks.length * 100 : 0) + '%';
-    card.querySelector('.sys-tools .mono').textContent = dc + '/' + sys.tasks.length;
-    card.classList.toggle('is-done', st[0] === 'done');
-  }
-
-  function updateSummaries(goal){
-    var t = tally(goal);
-    el('statSys').textContent = goal.systems.filter(sysDone).length;
-    el('statTask').textContent = t.done;
-    el('statTaskTotal').textContent = t.all;
-    ringArc.setAttribute('stroke-dashoffset', String(RING - RING * t.pct / 100));
-    ringArc.setAttribute('stroke', t.pct === 100 ? 'var(--mint)' : 'var(--pink)');
-    ringPct.textContent = t.pct + '%';
-    goalCard.classList.toggle('complete', goalDone(goal));
-    renderTabs();
-  }
-
-  function addGoal(){
-    if (goals.length >= MAX_GOALS) return;
-    api('/api/goals', 'POST', { name: 'New goal' }).then(function(data){
-      adopt(data);
-      sel = goals.length - 1;
-      render();
-      saveUi();
-      goalTitleEl.click();
-    }).catch(fail);
-  }
-
-  /* ------------------------------------------------------------- animation */
-
-  var SPARKS = ['✨','💗','⭐','🌸','💫'];
-  function burst(anchor){
-    if (reduced) return;
-    for (var i = 0; i < 7; i++){
-      var p = document.createElement('span');
-      p.className = 'spark';
-      p.textContent = SPARKS[i % SPARKS.length];
-      var a = (Math.PI * 2 * i) / 7 + Math.random() * 0.4;
-      var d = 26 + Math.random() * 16;
-      p.style.setProperty('--dx', Math.cos(a) * d + 'px');
-      p.style.setProperty('--dy', Math.sin(a) * d + 'px');
-      anchor.appendChild(p);
-      (function(node){ setTimeout(function(){ node.remove(); }, 760); })(p);
-    }
-  }
-
-  function say(message, kind){
-    var t = document.createElement('div');
-    t.className = 'toast' + (kind ? ' ' + kind : '');
-    t.textContent = message;
-    document.body.appendChild(t);
-    setTimeout(function(){ t.remove(); }, 2700);
-  }
-
-  function celebrate(kind, name){
-    var finale = kind === 'finale';
-    say(finale ? '🏆 Every goal complete — the whole board is done!'
-               : '🎉 ' + name + ' — every system complete!', finale ? 'finale' : '');
-    if (reduced) return;
-    var bits = finale ? ['🏆','🎉','✨','🌸','💗','⭐','🎀','💫'] : ['🎉','✨','🌸','💗','⭐','🎀'];
-    var n = finale ? 60 : 30;
-    for (var i = 0; i < n; i++){
-      var c = document.createElement('span');
-      c.className = 'confetti';
-      c.textContent = bits[Math.floor(Math.random() * bits.length)];
-      c.style.left = Math.random() * 100 + 'vw';
-      c.style.fontSize = (13 + Math.random() * (finale ? 16 : 11)) + 'px';
-      c.style.animationDuration = (1.7 + Math.random() * 1.3) + 's';
-      c.style.animationDelay = (Math.random() * (finale ? 0.7 : 0.25)) + 's';
-      document.body.appendChild(c);
-      (function(node){ setTimeout(function(){ node.remove(); }, 4200); })(c);
-    }
-  }
-
-  /* ------------------------------------------------------------ wire it up */
-
-  addSysBtn.addEventListener('click', function(){
-    var g = goals[sel];
-    if (!g || g.systems.length >= MAX_SYSTEMS) return;
-    api('/api/goals/' + g.id + '/systems', 'POST', { name: 'New system' }).then(function(data){
-      var before = new Set();
-      (goals[sel] ? goals[sel].systems : []).forEach(function(s){ before.add(s.id); });
-      adopt(data);
-      var fresh = (goals[sel] || { systems: [] }).systems.filter(function(s){ return !before.has(s.id); })[0];
-      if (fresh){ open.add(fresh.id); saveUi(); render(); }
-      var node = systemsEl.querySelector('.sys .nm');
-      if (node) node.click();
-    }).catch(fail);
+    b.append(ring, txt);
+    b.addEventListener('click', () => { sel = i; saveUi(); render(); });
+    tabsEl.appendChild(b);
   });
 
-  el('firstGoal').addEventListener('click', addGoal);
-
-  el('goalKill').addEventListener('click', function(){
-    var g = goals[sel];
-    if (!g) return;
-    api('/api/goals/' + g.id, 'DELETE').then(function(data){
-      adopt(data);
-      if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
-      saveUi();
-      render();
-    }).catch(fail);
-  });
-
-  goalTitleEl.addEventListener('click', function(){
-    var g = goals[sel];
-    if (!g) return;
-    startEdit(goalTitleEl, g.name, function(v){
-      api('/api/goals/' + g.id, 'PATCH', { name: v }).then(adopt).catch(fail);
-    });
-  });
-  goalTitleEl.addEventListener('keydown', function(e){
-    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); goalTitleEl.click(); }
-  });
-
-  el('signOut').addEventListener('click', function(){
-    api('/api/logout', 'POST').then(showGate).catch(showGate);
-  });
-
-  function render(){ renderTabs(); renderGoal(); }
-
-  /* ------------------------------------------------------------------ auth */
-
-  function showGate(){
-    gate.hidden = false;
-    app.hidden = true;
-    goals = []; sel = 0; open = new Set();
-    setTimeout(function(){ el('password').focus(); }, 30);
+  if (goals.length < MAX_GOALS){
+    const add = document.createElement('button');
+    add.className = 'tab add';
+    add.type = 'button';
+    add.textContent = '+ Add goal';
+    add.addEventListener('click', addGoal);
+    tabsEl.appendChild(add);
   }
 
-  function showApp(){
-    gate.hidden = true;
-    app.hidden = false;
+  goalCapEl.textContent = goals.length + ' / ' + MAX_GOALS + ' goals' +
+    (goals.length >= MAX_GOALS ? ' — ceiling reached' : '');
+}
+
+function renderGoal(){
+  const g = goals[sel];
+  const has = !!g;
+  goalCard.hidden = !has;
+  addSysRow.hidden = !has;
+  noGoals.hidden = has;
+  systemsEl.textContent = '';
+  if (!has) return;
+
+  goalTitleEl.textContent = g.name;
+  el('goalLabel').textContent = 'Goal ' + (sel + 1) + ' of ' + goals.length;
+  goalCard.classList.toggle('complete', goalDone(g));
+
+  const t = tally(g);
+  el('statSys').textContent = g.systems.filter(sysDone).length;
+  el('statSysTotal').textContent = g.systems.length;
+  el('statTask').textContent = t.done;
+  el('statTaskTotal').textContent = t.all;
+  ringArc.setAttribute('stroke-dashoffset', String(RING - RING * t.pct / 100));
+  ringArc.setAttribute('stroke', t.pct === 100 ? 'var(--mint)' : 'var(--pink)');
+  ringPct.textContent = t.pct + '%';
+
+  if (!g.systems.length){
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.innerHTML =
+      '<span class="emo">🧩</span>' +
+      '<strong>No systems yet</strong>' +
+      '<p>Break this goal into the areas it is really made of. Four at most — if you need a fifth, two of them are probably the same thing.</p>';
+    systemsEl.appendChild(e);
+  } else {
+    g.systems.forEach((sys, i) => systemsEl.appendChild(buildSystem(g, sys, i)));
   }
 
-  el('loginForm').addEventListener('submit', function(e){
-    e.preventDefault();
-    var pw = el('password').value;
-    var btn = el('loginBtn');
-    var err = el('loginErr');
-    err.textContent = '';
-    btn.disabled = true;
-    btn.textContent = 'Checking…';
-    api('/api/login', 'POST', { password: pw }).then(function(){
-      el('password').value = '';
-      showApp();
-      return loadBoard();
-    }).catch(function(e2){
-      err.textContent = e2.message || 'That did not work.';
-    }).finally(function(){
-      btn.disabled = false;
-      btn.textContent = 'Sign in';
-    });
+  addSysBtn.disabled = g.systems.length >= MAX_SYSTEMS;
+  sysCapEl.textContent = g.systems.length + ' / ' + MAX_SYSTEMS + ' systems in this goal' +
+    (g.systems.length >= MAX_SYSTEMS ? ' — ceiling reached' : '');
+}
+
+function buildSystem(goal, sys, i){
+  const [cls, label] = statusOf(sys);
+  const dc = sys.tasks.filter(t => t.done).length;
+  const pct = sys.tasks.length ? Math.round(dc / sys.tasks.length * 100) : 0;
+  const isOpen = open.has(sys.id);
+
+  const card = document.createElement('article');
+  card.className = 'sys' + (isOpen ? ' open' : '') + (cls === 'done' ? ' is-done' : '');
+
+  const seal = document.createElement('div');
+  seal.className = 'seal';
+  seal.textContent = 'SYSTEM COMPLETE';
+  card.appendChild(seal);
+
+  const head = document.createElement('div');
+  head.className = 'sys-head';
+
+  const code = document.createElement('span');
+  code.className = 'sys-code';
+  code.textContent = 'SYS-0' + (i + 1);
+
+  const main = document.createElement('div');
+  main.className = 'sys-main';
+
+  const nameRow = document.createElement('div');
+  nameRow.className = 'sys-name';
+  const nm = document.createElement('span');
+  nm.className = 'nm';
+  nm.tabIndex = 0;
+  nm.setAttribute('role', 'button');
+  nm.title = 'Click to rename';
+  nm.textContent = sys.name;
+  const renameSys = () => startEdit(nm, sys.name, async v => {
+    try { await run(sb.from('systems').update({ name: v }).eq('id', sys.id)); await reload(); }
+    catch (e){ fail(e); }
+  });
+  nm.addEventListener('click', e => { e.stopPropagation(); renameSys(); });
+  nm.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); renameSys(); }
+  });
+  const chip = document.createElement('span');
+  chip.className = 'chip ' + cls;
+  chip.textContent = label;
+  nameRow.append(nm, chip);
+
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  const fill = document.createElement('span');
+  fill.style.width = pct + '%';
+  bar.appendChild(fill);
+
+  main.append(nameRow, bar);
+
+  const tools = document.createElement('div');
+  tools.className = 'sys-tools';
+  const count = document.createElement('span');
+  count.className = 'mono';
+  count.textContent = dc + '/' + sys.tasks.length;
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'icon-btn';
+  toggleBtn.type = 'button';
+  toggleBtn.setAttribute('aria-expanded', String(isOpen));
+  toggleBtn.setAttribute('aria-label', (isOpen ? 'Collapse ' : 'Expand ') + sys.name);
+  toggleBtn.innerHTML = '<svg class="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" ' +
+    'stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" ' +
+    'aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+
+  const killSys = document.createElement('button');
+  killSys.className = 'icon-btn';
+  killSys.type = 'button';
+  killSys.setAttribute('aria-label', 'Delete system ' + sys.name);
+  killSys.title = 'Delete system';
+  killSys.textContent = '×';
+  killSys.addEventListener('click', async e => {
+    e.stopPropagation();
+    open.delete(sys.id);
+    try { await run(sb.from('systems').delete().eq('id', sys.id)); await reload(); }
+    catch (err){ fail(err); }
   });
 
-  /* --------------------------------------- migrating a device-only board */
+  tools.append(count, toggleBtn, killSys);
+  head.append(code, main, tools);
+  head.addEventListener('click', () => {
+    if (open.has(sys.id)) open.delete(sys.id); else open.add(sys.id);
+    saveUi();
+    render();
+  });
+  card.appendChild(head);
 
-  function legacyBoard(){
-    try{
-      var raw = localStorage.getItem(LEGACY_KEY);
-      if (!raw) return null;
-      var d = JSON.parse(raw);
-      if (d && Array.isArray(d.goals) && d.goals.length) return d;
-    }catch(e){}
-    return null;
+  const body = document.createElement('div');
+  body.className = 'sys-body';
+
+  if (sys.tasks.length){
+    const list = document.createElement('ul');
+    list.className = 'tasks';
+    sys.tasks.forEach(task => list.appendChild(buildTask(goal, sys, task, card)));
+    body.appendChild(list);
+  } else {
+    const te = document.createElement('div');
+    te.className = 'task-empty';
+    te.textContent = 'No tasks yet — an empty system never counts as done.';
+    body.appendChild(te);
   }
 
-  function offerImport(){
-    var legacy = legacyBoard();
-    if (!legacy || goals.length) return;
-    var banner = el('importBanner');
-    banner.hidden = false;
-    el('importBtn').onclick = function(){
-      el('importBtn').disabled = true;
-      api('/api/import', 'POST', { goals: legacy.goals }).then(function(data){
-        adopt(data);
-        banner.hidden = true;
-        try{ localStorage.removeItem(LEGACY_KEY); }catch(e){}
-        say('Imported — it is on all your devices now 🌸');
-      }).catch(function(e2){
-        el('importBtn').disabled = false;
-        fail(e2);
-      });
+  if (sys.tasks.length < MAX_TASKS){
+    const row = document.createElement('div');
+    row.className = 'addrow';
+    const tIn = document.createElement('input');
+    tIn.type = 'text';
+    tIn.placeholder = 'New task…';
+    tIn.maxLength = 90;
+    const dIn = document.createElement('input');
+    dIn.type = 'text';
+    dIn.className = 'dod-in';
+    dIn.placeholder = 'done when… (optional)';
+    dIn.maxLength = 110;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn';
+    btn.textContent = 'Add';
+
+    const submit = async () => {
+      const v = tIn.value.trim();
+      if (!v) return;
+      btn.disabled = true;
+      open.add(sys.id);
+      try {
+        await run(sb.from('tasks').insert({ system_id: sys.id, title: v, dod: dIn.value.trim() }));
+        await reload();
+      } catch (e){ btn.disabled = false; fail(e); }
     };
-    el('importSkip').onclick = function(){ banner.hidden = true; };
+    btn.addEventListener('click', submit);
+    const onKey = e => { if (e.key === 'Enter'){ e.preventDefault(); submit(); } };
+    tIn.addEventListener('keydown', onKey);
+    dIn.addEventListener('keydown', onKey);
+
+    row.append(tIn, dIn, btn);
+    body.appendChild(row);
+  } else {
+    const note = document.createElement('div');
+    note.className = 'cap-note';
+    note.textContent = 'System full at ' + MAX_TASKS + ' tasks — finish one, or split the system.';
+    body.appendChild(note);
   }
 
-  /* ------------------------------------------------------------------ boot */
+  card.appendChild(body);
+  return card;
+}
 
-  function loadBoard(){
-    return api('/api/board').then(function(data){
-      adopt(data);
-      offerImport();
-      booted = true;
-    }).catch(function(e){
-      if (e && e.message !== 'Signed out') fail(e);
+function buildTask(goal, sys, task, card){
+  const li = document.createElement('li');
+  li.className = 'task' + (task.done ? ' done' : '');
+
+  const box = document.createElement('button');
+  box.className = 'box';
+  box.type = 'button';
+  box.setAttribute('aria-pressed', String(!!task.done));
+  box.setAttribute('aria-label', (task.done ? 'Untick: ' : 'Tick: ') + task.title);
+  box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<polyline points="20 6 9 17 4 12"></polyline></svg>';
+  box.addEventListener('click', () => toggleTask(goal, sys, task, li, box, card));
+
+  const text = document.createElement('div');
+  text.className = 'task-text';
+
+  const title = document.createElement('div');
+  title.className = 'task-title';
+  const tnm = document.createElement('span');
+  tnm.className = 'nm';
+  tnm.tabIndex = 0;
+  tnm.setAttribute('role', 'button');
+  tnm.title = 'Click to edit';
+  tnm.textContent = task.title;
+  const editTitle = () => startEdit(tnm, task.title, async v => {
+    try { await run(sb.from('tasks').update({ title: v }).eq('id', task.id)); await reload(); }
+    catch (e){ fail(e); }
+  });
+  tnm.addEventListener('click', editTitle);
+  tnm.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); editTitle(); }
+  });
+  title.appendChild(tnm);
+
+  const dod = document.createElement('div');
+  dod.className = 'dod' + (task.dod ? '' : ' empty');
+  const dnm = document.createElement('span');
+  dnm.className = 'nm';
+  dnm.tabIndex = 0;
+  dnm.setAttribute('role', 'button');
+  dnm.title = 'Click to edit';
+  if (task.dod){
+    dod.innerHTML = '<b>done when</b> · ';
+    dnm.textContent = task.dod;
+  } else {
+    dnm.textContent = '+ add a done-when';
+  }
+  const editDod = () => startEdit(dnm, task.dod, async v => {
+    try { await run(sb.from('tasks').update({ dod: v }).eq('id', task.id)); await reload(); }
+    catch (e){ fail(e); }
+  }, 'done when…');
+  dnm.addEventListener('click', editDod);
+  dnm.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); editDod(); }
+  });
+  dod.appendChild(dnm);
+
+  text.append(title, dod);
+
+  const kill = document.createElement('button');
+  kill.className = 'icon-btn';
+  kill.type = 'button';
+  kill.setAttribute('aria-label', 'Delete task ' + task.title);
+  kill.title = 'Delete task';
+  kill.textContent = '×';
+  kill.addEventListener('click', async () => {
+    try { await run(sb.from('tasks').delete().eq('id', task.id)); await reload(); }
+    catch (e){ fail(e); }
+  });
+
+  li.append(box, text, kill);
+  return li;
+}
+
+/* ------------------------------------------------------------ interactions */
+
+async function toggleTask(goal, sys, task, li, box, card){
+  const sysWas = sysDone(sys);
+  const goalWas = goalDone(goal);
+  const allWas = goals.length > 0 && goals.every(goalDone);
+  const prev = task.done;
+
+  // Optimistic: the animation has to fire on the click, not a round trip
+  // later, and a full re-render would destroy the card mid-animation.
+  task.done = !prev;
+  li.classList.toggle('done', task.done);
+  box.setAttribute('aria-pressed', String(task.done));
+  box.setAttribute('aria-label', (task.done ? 'Untick: ' : 'Tick: ') + task.title);
+  if (task.done) burst(box);
+  paintSystem(sys, card);
+  updateSummaries(goal);
+
+  if (!sysWas && sysDone(sys)){
+    card.classList.add('sealing');
+    setTimeout(() => card.classList.remove('sealing'), 1300);
+  }
+  if (!goalWas && goalDone(goal)){
+    const allNow = goals.length > 0 && goals.every(goalDone);
+    setTimeout(() => celebrate(allNow && !allWas ? 'finale' : 'goal', goal.name), 420);
+  }
+
+  try {
+    await run(sb.from('tasks').update({ done: task.done }).eq('id', task.id));
+    await reload(true);           // keep the DOM we just animated
+  } catch (e){
+    task.done = prev;             // put it back
+    render();
+    fail(e);
+  }
+}
+
+function paintSystem(sys, card){
+  const st = statusOf(sys);
+  const dc = sys.tasks.filter(t => t.done).length;
+  const chip = card.querySelector('.chip');
+  chip.className = 'chip ' + st[0];
+  chip.textContent = st[1];
+  card.querySelector('.bar span').style.width =
+    (sys.tasks.length ? dc / sys.tasks.length * 100 : 0) + '%';
+  card.querySelector('.sys-tools .mono').textContent = dc + '/' + sys.tasks.length;
+  card.classList.toggle('is-done', st[0] === 'done');
+}
+
+function updateSummaries(goal){
+  const t = tally(goal);
+  el('statSys').textContent = goal.systems.filter(sysDone).length;
+  el('statTask').textContent = t.done;
+  el('statTaskTotal').textContent = t.all;
+  ringArc.setAttribute('stroke-dashoffset', String(RING - RING * t.pct / 100));
+  ringArc.setAttribute('stroke', t.pct === 100 ? 'var(--mint)' : 'var(--pink)');
+  ringPct.textContent = t.pct + '%';
+  goalCard.classList.toggle('complete', goalDone(goal));
+  renderTabs();
+}
+
+async function addGoal(){
+  if (goals.length >= MAX_GOALS) return;
+  try {
+    await run(sb.from('goals').insert({ name: 'New goal' }));
+    await reload();
+    sel = goals.length - 1;
+    render();
+    saveUi();
+    goalTitleEl.click();
+  } catch (e){ fail(e); }
+}
+
+addSysBtn.addEventListener('click', async () => {
+  const g = goals[sel];
+  if (!g || g.systems.length >= MAX_SYSTEMS) return;
+  const before = new Set(g.systems.map(s => s.id));
+  try {
+    await run(sb.from('systems').insert({ goal_id: g.id, name: 'New system' }));
+    await reload();
+    const fresh = (goals[sel] || { systems: [] }).systems.find(s => !before.has(s.id));
+    if (fresh){ open.add(fresh.id); saveUi(); render(); }
+    const node = systemsEl.querySelector('.sys .nm');
+    if (node) node.click();
+  } catch (e){ fail(e); }
+});
+
+el('firstGoal').addEventListener('click', addGoal);
+
+el('goalKill').addEventListener('click', async () => {
+  const g = goals[sel];
+  if (!g) return;
+  try {
+    await run(sb.from('goals').delete().eq('id', g.id));
+    await reload();
+    if (sel >= goals.length) sel = Math.max(0, goals.length - 1);
+    saveUi();
+    render();
+  } catch (e){ fail(e); }
+});
+
+goalTitleEl.addEventListener('click', () => {
+  const g = goals[sel];
+  if (!g) return;
+  startEdit(goalTitleEl, g.name, async v => {
+    try { await run(sb.from('goals').update({ name: v }).eq('id', g.id)); await reload(); }
+    catch (e){ fail(e); }
+  });
+});
+goalTitleEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); goalTitleEl.click(); }
+});
+
+el('signOut').addEventListener('click', async () => {
+  try { await sb.auth.signOut(); } catch (e){ /* fall through to the gate anyway */ }
+  showGate();
+});
+
+function render(){ renderTabs(); renderGoal(); }
+
+/* ------------------------------------------------------------- animation */
+
+const SPARKS = ['✨','💗','⭐','🌸','💫'];
+function burst(anchor){
+  if (reduced) return;
+  for (let i = 0; i < 7; i++){
+    const p = document.createElement('span');
+    p.className = 'spark';
+    p.textContent = SPARKS[i % SPARKS.length];
+    const a = (Math.PI * 2 * i) / 7 + Math.random() * 0.4;
+    const d = 26 + Math.random() * 16;
+    p.style.setProperty('--dx', Math.cos(a) * d + 'px');
+    p.style.setProperty('--dy', Math.sin(a) * d + 'px');
+    anchor.appendChild(p);
+    setTimeout(() => p.remove(), 760);
+  }
+}
+
+function say(message, kind){
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  t.textContent = message;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2700);
+}
+
+function celebrate(kind, name){
+  const finale = kind === 'finale';
+  say(finale ? '🏆 Every goal complete — the whole board is done!'
+             : '🎉 ' + name + ' — every system complete!', finale ? 'finale' : '');
+  if (reduced) return;
+  const bits = finale ? ['🏆','🎉','✨','🌸','💗','⭐','🎀','💫'] : ['🎉','✨','🌸','💗','⭐','🎀'];
+  const n = finale ? 60 : 30;
+  for (let i = 0; i < n; i++){
+    const c = document.createElement('span');
+    c.className = 'confetti';
+    c.textContent = bits[Math.floor(Math.random() * bits.length)];
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.fontSize = (13 + Math.random() * (finale ? 16 : 11)) + 'px';
+    c.style.animationDuration = (1.7 + Math.random() * 1.3) + 's';
+    c.style.animationDelay = (Math.random() * (finale ? 0.7 : 0.25)) + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4200);
+  }
+}
+
+/* ------------------------------------------------------------------- auth */
+
+function showGate(){
+  gate.hidden = false;
+  app.hidden = true;
+  goals = []; sel = 0; open = new Set(); uid = null; booted = false;
+  stopRealtime();
+  setTimeout(() => { const e = el('email'); if (e) e.focus(); }, 30);
+}
+
+function showApp(){
+  gate.hidden = true;
+  app.hidden = false;
+}
+
+el('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!sb) return;
+  const btn = el('loginBtn'), err = el('loginErr');
+  err.className = 'gate-err';
+  err.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const { error } = await sb.auth.signInWithPassword({
+      email: el('email').value.trim(),
+      password: el('password').value
     });
+    if (error) throw error;
+    el('password').value = '';
+    showApp();
+    await start();
+  } catch (e2){
+    err.textContent = e2.message || 'That did not work.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+});
+
+el('forgot').addEventListener('click', async () => {
+  if (!sb) return;
+  const email = el('email').value.trim();
+  const err = el('loginErr');
+  if (!email){
+    err.className = 'gate-err';
+    err.textContent = 'Put your email in first, then press this.';
+    return;
+  }
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+    if (error) throw error;
+    err.className = 'gate-err ok';
+    err.textContent = 'Check your email for a reset link.';
+  } catch (e){
+    err.className = 'gate-err';
+    err.textContent = e.message || 'Could not send that.';
+  }
+});
+
+/* ------------------------------------------------------------- realtime */
+
+let channel = null;
+let liveTimer = null;
+
+function startRealtime(){
+  stopRealtime();
+  channel = sb.channel('board-' + uid);
+  for (const table of ['goals', 'systems', 'tasks']){
+    channel.on('postgres_changes',
+      { event: '*', schema: 'public', table, filter: 'user_id=eq.' + uid },
+      () => {
+        // Another device changed something. Debounced, and skipped while a
+        // write of our own is in flight so it cannot fight the optimistic UI.
+        clearTimeout(liveTimer);
+        liveTimer = setTimeout(() => { if (busy === 0) reload().catch(() => {}); }, 500);
+      });
+  }
+  channel.subscribe();
+}
+
+function stopRealtime(){
+  if (channel){ try { sb.removeChannel(channel); } catch (e){} channel = null; }
+}
+
+/* --------------------------------------- migrating a device-only board */
+
+function legacyBoard(){
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (d && Array.isArray(d.goals) && d.goals.length) return d;
+  } catch (e){}
+  return null;
+}
+
+function offerImport(){
+  const legacy = legacyBoard();
+  if (!legacy || goals.length) return;
+  const banner = el('importBanner');
+  banner.hidden = false;
+  el('importBtn').onclick = async () => {
+    el('importBtn').disabled = true;
+    try {
+      for (const g of legacy.goals.slice(0, MAX_GOALS)){
+        const goal = await run(
+          sb.from('goals').insert({ name: (g.name || 'Untitled goal').slice(0, 80) }).select().single()
+        );
+        for (const s of (g.systems || []).slice(0, MAX_SYSTEMS)){
+          const sys = await run(
+            sb.from('systems')
+              .insert({ goal_id: goal.id, name: (s.name || 'Untitled system').slice(0, 80) })
+              .select().single()
+          );
+          const rows = (s.tasks || []).slice(0, MAX_TASKS)
+            .filter(t => t && t.title && t.title.trim())
+            .map(t => ({
+              system_id: sys.id,
+              title: String(t.title).slice(0, 90),
+              dod: String(t.dod || '').slice(0, 110),
+              done: !!t.done
+            }));
+          for (const row of rows) await run(sb.from('tasks').insert(row));
+        }
+      }
+      await reload();
+      banner.hidden = true;
+      try { localStorage.removeItem(LEGACY_KEY); } catch (e){}
+      say('Imported — it is on all your devices now 🌸');
+    } catch (e){
+      el('importBtn').disabled = false;
+      fail(e);
+    }
+  };
+  el('importSkip').onclick = () => { banner.hidden = true; };
+}
+
+/* ------------------------------------------------------------------ boot */
+
+async function start(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session){ showGate(); return; }
+  uid = session.user.id;
+  showApp();
+  try {
+    await reload();
+    offerImport();
+    startRealtime();
+    booted = true;
+  } catch (e){ fail(e); }
+}
+
+// Another device may have changed things while this tab sat in the background,
+// and realtime does not deliver while the socket is asleep.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && booted && !app.hidden && busy === 0) reload().catch(() => {});
+});
+
+function gateNotice(html){
+  el('loginForm').hidden = true;
+  el('resetRow').hidden = true;
+  const box = document.createElement('div');
+  box.className = 'setup';
+  box.innerHTML = html;
+  el('loginErr').replaceWith(box);
+  gate.hidden = false;
+  app.hidden = true;
+}
+
+async function boot(){
+  if (!configured){
+    gateNotice(
+      '<strong>Almost there.</strong> Put your Supabase project URL and anon key in ' +
+      '<code>public/config.js</code>, then redeploy. Both are in the Supabase ' +
+      'dashboard under Project Settings → API.'
+    );
+    return;
   }
 
-  // Another device may have changed the board while this tab sat idle.
-  document.addEventListener('visibilitychange', function(){
-    if (!document.hidden && booted && !app.hidden && inFlight === 0) {
-      api('/api/board').then(function(d){ adopt(d); }).catch(function(){});
-    }
-  });
+  let createClient;
+  try {
+    ({ createClient } = await import(SUPABASE_LIB));
+  } catch (e){
+    gateNotice(
+      '<strong>Could not load the Supabase library.</strong> Check your connection, ' +
+      'or whether something on this network blocks <code>cdn.jsdelivr.net</code>. ' +
+      'Your data is safe — this is only the page failing to fetch its code.'
+    );
+    return;
+  }
 
-  api('/api/session').then(function(d){
-    if (d.authed){ showApp(); loadBoard(); }
-    else showGate();
-  }).catch(function(){
-    showGate();
-    el('loginErr').textContent = 'Cannot reach the server.';
+  sb = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true }
   });
-})();
+  sb.auth.onAuthStateChange(event => { if (event === 'SIGNED_OUT') showGate(); });
+  await start();
+}
+
+boot();
 </script>
-</body>
-</html>

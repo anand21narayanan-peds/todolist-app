@@ -8,155 +8,93 @@ tasks do, a goal when all its systems do, so progress is computed upward from th
 checkboxes. Each task can carry a `done when` clause, which makes "finished" a
 fact rather than a feeling.
 
-Boards live in a Cloudflare D1 database behind a single password login, so the
-same board shows up on every device you sign in from. Plain HTML/CSS/JS on the
-front end — no framework, no build step.
+Data lives in **Supabase** (Postgres) behind a real login, so the same board
+shows up on every device you sign in from, and updates live while you have it
+open. The front end is plain HTML/CSS/JS — no framework, no build step.
 
 ## Layout
 
 ```
-wrangler.jsonc          # worker name, assets config, D1 binding
-schema.sql              # database tables
-src/index.js            # the Worker: auth + JSON API, falls through to assets
-scripts/hash-password.mjs  # turns a password into the stored verifier
-scripts/setup.sh        # one-command Cloudflare setup
+wrangler.jsonc     # Cloudflare Worker: static files only, no server code
+schema.sql         # Postgres tables, RLS policies, cap triggers
 public/
-  index.html            # the whole front end
-  set-password.html     # one-time, browser-side verifier generator
+  index.html       # the whole app
+  config.js        # your Supabase URL + anon key
 ```
 
-Two things about this layout are deliberate:
-
-- **The config lives at the repo root**, so `wrangler deploy` finds it without
-  Cloudflare needing a "root directory" build setting. One less dashboard field
-  to get wrong.
-- **Served files live in `public/`**, not at the root. If `assets.directory`
-  pointed at the root, `wrangler.jsonc`, `package.json`, and anything npm
-  generates during the build would all be published as public assets too.
+There is no server of ours. The browser talks to Supabase directly, and
+Cloudflare only hands over static files — which is why `wrangler.jsonc` has no
+`main`, no bindings and no secrets.
 
 ## Data model
 
-Three tables, one row per thing, mirroring the goal → system → task shape:
-
 ```
-goals(id, name, position)
-  systems(id, goal_id → goals.id, name, position)
-    tasks(id, system_id → systems.id, title, dod, done, position)
-prefs(id, value)   -- which tab was open, which systems were expanded
+goals(id, user_id, name, position)
+  systems(id, user_id, goal_id → goals.id, name, position)
+    tasks(id, user_id, system_id → systems.id, title, dod, done, position)
+prefs(user_id, sel, open)   -- which tab was open, which systems were expanded
 ```
 
-Nothing stores a "percent complete" or a "system is done" flag: those are
-derived on read, so two devices can never disagree about them. The 4/4/4 caps
-are enforced in the Worker on every insert — a client that skips the UI still
-cannot exceed them.
+No "percent complete" or "system is done" column exists: both are derived on
+read, so two devices can never disagree about them.
 
 `prefs` is why a phone and a laptop feel like the same app rather than two
-copies: the selected goal and the expanded systems travel with the account.
+copies — the selected goal and expanded systems travel with the account.
 
-## Security
+Three rules live in the database rather than the app, because that is the only
+place they cannot be skipped:
 
-- The password is never stored. `APP_PASSWORD_HASH` holds a PBKDF2-SHA256
-  verifier (210,000 iterations) that cannot be reversed.
-- Login issues an HMAC-signed, `HttpOnly` `Secure` `SameSite=Lax` cookie. The
-  signing key is derived from the password verifier, so changing the password
-  invalidates every existing session automatically.
-- Mutations also check the `Origin` header.
-- The HTML shell is public; every byte of board data requires the session.
+- **Ownership** — row level security scopes every row to `auth.uid()`.
+- **The 4/4/4 caps** — `BEFORE INSERT` triggers. Postgres can express "at most
+  four children"; SQLite could not, which is why this moved out of app code.
+- **Ordering** — `position` is assigned server-side and never sent by the client.
 
-There is no brute-force lockout — PBKDF2 plus a delay on failure is the only
-rate limiting. Use a long password.
+## Setting it up
 
-## First-time setup
+**1. Create a Supabase project**, then open the **SQL Editor**, paste all of
+`schema.sql`, and run it.
 
-Two routes. Both end in the same place; pick whichever suits you.
+**2. Create your login.** Authentication → **Users** → *Add user*, with your
+email and a password. Then in Authentication settings turn **"Allow new users to
+sign up" off**, so the project stays yours alone. The app has no sign-up screen
+by design.
 
-### Route A — browser only, no terminal
+**3. Fill in `public/config.js`** with the Project URL and the **anon** key from
+Project Settings → API, and push. Cloudflare redeploys on its own.
 
-Everything happens in the Cloudflare dashboard and GitHub's web editor.
+Until step 3, the app loads and tells you what is missing rather than failing
+silently.
 
-1. **Create the database.** Cloudflare dashboard → **Storage & Databases → D1 →
-   Create database**. Name it `todolist-db`. Copy the **Database ID** it shows.
-2. **Put that id in the config.** On GitHub, open `wrangler.jsonc` → pencil icon →
-   replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` with the id → Commit.
-   That push triggers a deploy, which will now succeed.
-3. **Create the tables.** Back in D1 → `todolist-db` → **Console**. Paste the whole
-   contents of `schema.sql` and Execute. It should report **6 commands executed**;
-   run `/tables` afterwards and you should see `goals`, `systems`, `tasks`, `prefs`.
-   (`schema.sql` uses block comments deliberately — the console flattens a paste
-   onto one line, and a `--` comment would swallow the rest of the script, failing
-   with "SQL code did not contain a statement".)
-4. **Choose a password.** Visit `/set-password.html` on your deployed site. It
-   computes the verifier in your own browser — the password itself never leaves
-   the tab. Copy the verifier.
-5. **Store it.** Worker → **Settings → Variables and Secrets → Add** → type
-   **Secret**, name `APP_PASSWORD_HASH`, value the verifier. Save and Deploy.
+### About the anon key
 
-Then sign in at `/`. Once it works you can delete `public/set-password.html`.
+It is meant to be public — it ships in every Supabase web app and identifies the
+project, not you. Row level security is what actually protects the data, which
+is why most of `schema.sql` is policies. The **service_role** key is the
+dangerous one: it bypasses RLS entirely. It must never appear in `public/`.
 
-### Route B — one command, from a checkout
+## Deploying to Cloudflare
 
-Needs Node and a local clone:
-
-```sh
-npm run setup
-```
-
-Signs you in if needed, creates the database, writes its id into
-`wrangler.jsonc`, creates the tables, and asks for a password. Safe to re-run.
-Then commit the id it wrote:
-
-```sh
-git add wrangler.jsonc && git commit -m "Point at the D1 database" && git push
-```
-
-<details>
-<summary>Or step by step</summary>
-
-```sh
-npx wrangler login
-npx wrangler d1 create todolist-db          # copy the printed id
-node scripts/set-db-id.mjs <that-id>        # or edit wrangler.jsonc yourself
-npx wrangler d1 execute todolist-db --remote --file=./schema.sql
-node scripts/hash-password.mjs              # choose a password
-npx wrangler secret put APP_PASSWORD_HASH   # paste the printed verifier
-```
-</details>
-
-Until `database_id` is a real id, **`wrangler deploy` fails** — the placeholder
-in a fresh checkout is deliberate, so a misconfigured deploy is loud rather than
-silently writing nowhere. Until the secret is set, the API answers `503` with a
-message naming what is missing.
-
-To change the password later, run `npm run password` and
-`npx wrangler secret put APP_PASSWORD_HASH`. Every device is signed out.
-
-## Deploying to Cloudflare (Workers Builds)
-
-1. Cloudflare dashboard → **Workers & Pages → Create → Import a repository**, pick this repo.
-2. **Worker name**: must exactly match `name` in `wrangler.jsonc` (`todolist-app`).
-   A mismatch deploys to a different Worker and breaks the Git connection.
-3. **Build command**: leave empty. **Deploy command**: `npx wrangler deploy`.
-4. **Root directory**: leave empty — the config is at the repo root.
+1. **Workers & Pages → Create → Import a repository**, pick this repo.
+2. **Worker name**: must match `name` in `wrangler.jsonc` (`todolist-app`).
+3. **Build command**: empty. **Deploy command**: `npx wrangler deploy`.
+4. **Root directory**: empty — the config is at the repo root.
 5. **Production branch**: `main`.
-6. **API token**: needs Workers permissions — the "Edit Cloudflare Workers"
-   template works. A token scoped to something else fails with a permissions note.
 
 ## Developing
 
-Run the Worker and a local database:
-
 ```sh
-# a local-only password, never committed (.dev.vars is gitignored)
-node scripts/hash-password.mjs        # paste as APP_PASSWORD_HASH=... into .dev.vars
-npx wrangler d1 execute todolist-db --local --file=./schema.sql
-npx wrangler dev
+npm run dev      # serves public/ at http://localhost:8000
+npm run check    # wrangler deploy --dry-run
 ```
 
-To check a change deploys before pushing:
+It talks to your real Supabase project either way; there is nothing to run
+locally besides a static file server.
 
-```sh
-npx wrangler deploy --dry-run
-```
+## Notes
 
-It should report reading exactly **1 file** from `public`. A higher count means
-config files are leaking into the published assets.
+- The Supabase client is loaded with a dynamic `import()` inside a `try`. A
+  static import that fails aborts the whole module and renders a blank page with
+  no explanation; this way a CDN outage produces a message instead.
+- Supabase pauses free-tier projects after about a week of inactivity. If the
+  app cannot reach the database after a quiet spell, un-pause it in the
+  dashboard.
