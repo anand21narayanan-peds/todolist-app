@@ -17,8 +17,9 @@
     {
       "binding": "DB",
       "database_name": "todolist-db",
-      // Replace with the id printed by:  npx wrangler d1 create todolist-db
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      // Not a secret — it only names the database; using it still requires
+      // account auth. `npx wrangler d1 list` prints it again if needed.
+      "database_id": "fe93f92d-7010-47d3-86ff-1800db194c78"
     }
   ]
 
