@@ -19,8 +19,10 @@ wrangler.jsonc          # worker name, assets config, D1 binding
 schema.sql              # database tables
 src/index.js            # the Worker: auth + JSON API, falls through to assets
 scripts/hash-password.mjs  # turns a password into the stored verifier
+scripts/setup.sh        # one-command Cloudflare setup
 public/
   index.html            # the whole front end
+  set-password.html     # one-time, browser-side verifier generator
 ```
 
 Two things about this layout are deliberate:
@@ -66,24 +68,45 @@ rate limiting. Use a long password.
 
 ## First-time setup
 
-From a checkout, with the repo's Cloudflare account:
+Two routes. Both end in the same place; pick whichever suits you.
+
+### Route A — browser only, no terminal
+
+Everything happens in the Cloudflare dashboard and GitHub's web editor.
+
+1. **Create the database.** Cloudflare dashboard → **Storage & Databases → D1 →
+   Create database**. Name it `todolist-db`. Copy the **Database ID** it shows.
+2. **Put that id in the config.** On GitHub, open `wrangler.jsonc` → pencil icon →
+   replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` with the id → Commit.
+   That push triggers a deploy, which will now succeed.
+3. **Create the tables.** Back in D1 → `todolist-db` → **Console**. Paste the whole
+   contents of `schema.sql` and run it.
+4. **Choose a password.** Visit `/set-password.html` on your deployed site. It
+   computes the verifier in your own browser — the password itself never leaves
+   the tab. Copy the verifier.
+5. **Store it.** Worker → **Settings → Variables and Secrets → Add** → type
+   **Secret**, name `APP_PASSWORD_HASH`, value the verifier. Save and Deploy.
+
+Then sign in at `/`. Once it works you can delete `public/set-password.html`.
+
+### Route B — one command, from a checkout
+
+Needs Node and a local clone:
 
 ```sh
 npm run setup
 ```
 
-That signs you in if needed, creates the `todolist-db` database, writes its id
-into `wrangler.jsonc`, creates the tables, and asks for a password. It is safe
-to re-run — every step checks for what already exists first.
-
-Then commit the id it wrote, so the Git build uses the same database:
+Signs you in if needed, creates the database, writes its id into
+`wrangler.jsonc`, creates the tables, and asks for a password. Safe to re-run.
+Then commit the id it wrote:
 
 ```sh
 git add wrangler.jsonc && git commit -m "Point at the D1 database" && git push
 ```
 
 <details>
-<summary>Doing it by hand instead</summary>
+<summary>Or step by step</summary>
 
 ```sh
 npx wrangler login
