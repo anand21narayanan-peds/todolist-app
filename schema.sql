@@ -1,10 +1,16 @@
--- Cute To-Do — D1 schema
---
--- One account, one shared board. The 4/4/4 shape is enforced in the Worker
--- (SQLite cannot express "at most 4 children" as a constraint), but the
--- structure below is what makes the caps checkable: counting rows per parent.
+/*
+  Cute To-Do — D1 schema
 
-PRAGMA foreign_keys = ON;
+  One account, one shared board.
+
+  The 4/4/4 shape is enforced in the Worker (SQLite cannot express "at most
+  4 children" as a constraint), but the structure below is what makes the
+  caps checkable: counting rows per parent.
+
+  Comments here are block comments on purpose. The D1 dashboard console
+  collapses a pasted file onto one line, and a "--" comment would then run
+  to the end of that line and swallow the entire script.
+*/
 
 CREATE TABLE IF NOT EXISTS goals (
   id         TEXT    PRIMARY KEY,
@@ -34,9 +40,11 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_systems_goal ON systems(goal_id, position);
 CREATE INDEX IF NOT EXISTS idx_tasks_system ON tasks(system_id, position);
 
--- Single-row table holding UI state that belongs to the account rather than
--- to a device: which goal tab was open, which systems were expanded.
--- This is what makes a phone and a laptop feel like the same app.
+/*
+  Single-row table holding UI state that belongs to the account rather than
+  to a device: which goal tab was open, which systems were expanded. This is
+  what makes a phone and a laptop feel like the same app.
+*/
 CREATE TABLE IF NOT EXISTS prefs (
   id    TEXT PRIMARY KEY,
   value TEXT NOT NULL

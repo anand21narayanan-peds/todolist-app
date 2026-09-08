@@ -80,7 +80,11 @@ Everything happens in the Cloudflare dashboard and GitHub's web editor.
    replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` with the id → Commit.
    That push triggers a deploy, which will now succeed.
 3. **Create the tables.** Back in D1 → `todolist-db` → **Console**. Paste the whole
-   contents of `schema.sql` and run it.
+   contents of `schema.sql` and Execute. It should report **6 commands executed**;
+   run `/tables` afterwards and you should see `goals`, `systems`, `tasks`, `prefs`.
+   (`schema.sql` uses block comments deliberately — the console flattens a paste
+   onto one line, and a `--` comment would swallow the rest of the script, failing
+   with "SQL code did not contain a statement".)
 4. **Choose a password.** Visit `/set-password.html` on your deployed site. It
    computes the verifier in your own browser — the password itself never leaves
    the tab. Copy the verifier.
