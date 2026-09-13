@@ -11,69 +11,75 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Quicksand:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
+  /*  Cotton Candy  —  bubblegum pink against sky blue.
+      Two mint tokens on purpose: --mint is deep enough for small uppercase
+      chip text, --mint-fill is the brighter one used for filled shapes. */
   :root{
-    --ground:      #fdf7fa;
-    --ground-tint: #f7edf4;
+    --ground:      #f4f9ff;
+    --ground-tint: #e9f1fd;
     --card:        #ffffff;
-    --card-sunk:   #fbf4f8;
-    --ink:         #54415c;
-    --ink-soft:    #8d7897;
-    --ink-faint:   #b3a2bb;
-    --rule:        #f0e0ea;
-    --rule-strong: #e2cdda;
-    --pink:        #ff6fa5;
-    --pink-wash:   #ffeaf3;
-    --lav:         #8f72f0;
-    --lav-wash:    #ede7ff;
-    --mint:        #35a878;
-    --mint-wash:   #e2f7ee;
-    --peach:       #e08334;
-    --peach-wash:  #fff0e0;
-    --shadow:      0 10px 28px rgba(190,120,160,.14);
-    --shadow-lift: 0 16px 40px rgba(190,120,160,.22);
+    --card-sunk:   #f5f9ff;
+    --ink:         #4a4660;
+    --ink-soft:    #8a87a4;
+    --ink-faint:   #b2aec8;
+    --rule:        #e6eefb;
+    --rule-strong: #d2ddf2;
+    --pink:        #ff92c9;
+    --pink-wash:   #ffe9f4;
+    --lav:         #7cc4f7;
+    --lav-wash:    #e2f1fe;
+    --mint:        #1f9e79;
+    --mint-fill:   #47cfa4;
+    --mint-wash:   #dcf7ee;
+    --peach:       #c4781b;
+    --peach-wash:  #fff1dd;
+    --shadow:      0 10px 28px rgba(124,196,247,.20);
+    --shadow-lift: 0 16px 40px rgba(255,146,201,.22);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --ground:      #1c1622;
-      --ground-tint: #251d2d;
-      --card:        #2a2133;
-      --card-sunk:   #221a2a;
-      --ink:         #f3e9f6;
-      --ink-soft:    #b6a4c0;
-      --ink-faint:   #7d6c88;
-      --rule:        #3a2f45;
-      --rule-strong: #4c3d59;
-      --pink:        #ff8ab8;
-      --pink-wash:   #3d2334;
-      --lav:         #b49bff;
-      --lav-wash:    #2f2748;
-      --mint:        #5fd6a4;
-      --mint-wash:   #1f3a31;
-      --peach:       #ffb474;
-      --peach-wash:  #3b2c1c;
-      --shadow:      0 10px 28px rgba(0,0,0,.4);
+      --ground:      #161a28;
+      --ground-tint: #2a3150;
+      --card:        #1f2438;
+      --card-sunk:   #262c44;
+      --ink:         #eef2fd;
+      --ink-soft:    #a9b1cf;
+      --ink-faint:   #737c9e;
+      --rule:        #2d3450;
+      --rule-strong: #3c456b;
+      --pink:        #ffa6d3;
+      --pink-wash:   #3a2438;
+      --lav:         #8fcdff;
+      --lav-wash:    #22334d;
+      --mint:        #62dcb4;
+      --mint-fill:   #4bc79c;
+      --mint-wash:   #12342b;
+      --peach:       #ffbe73;
+      --peach-wash:  #3a2c17;
+      --shadow:      0 10px 28px rgba(0,0,0,.42);
       --shadow-lift: 0 16px 40px rgba(0,0,0,.5);
     }
   }
   :root[data-theme="dark"]{
-    --ground:      #1c1622;
-    --ground-tint: #251d2d;
-    --card:        #2a2133;
-    --card-sunk:   #221a2a;
-    --ink:         #f3e9f6;
-    --ink-soft:    #b6a4c0;
-    --ink-faint:   #7d6c88;
-    --rule:        #3a2f45;
-    --rule-strong: #4c3d59;
-    --pink:        #ff8ab8;
-    --pink-wash:   #3d2334;
-    --lav:         #b49bff;
-    --lav-wash:    #2f2748;
-    --mint:        #5fd6a4;
-    --mint-wash:   #1f3a31;
-    --peach:       #ffb474;
-    --peach-wash:  #3b2c1c;
-    --shadow:      0 10px 28px rgba(0,0,0,.4);
+    --ground:      #161a28;
+    --ground-tint: #2a3150;
+    --card:        #1f2438;
+    --card-sunk:   #262c44;
+    --ink:         #eef2fd;
+    --ink-soft:    #a9b1cf;
+    --ink-faint:   #737c9e;
+    --rule:        #2d3450;
+    --rule-strong: #3c456b;
+    --pink:        #ffa6d3;
+    --pink-wash:   #3a2438;
+    --lav:         #8fcdff;
+    --lav-wash:    #22334d;
+    --mint:        #62dcb4;
+    --mint-fill:   #4bc79c;
+    --mint-wash:   #12342b;
+    --peach:       #ffbe73;
+    --peach-wash:  #3a2c17;
+    --shadow:      0 10px 28px rgba(0,0,0,.42);
     --shadow-lift: 0 16px 40px rgba(0,0,0,.5);
   }
 
@@ -95,7 +101,7 @@
 
   .wrap{
     max-width: 880px; margin: 0 auto;
-    padding: 36px 20px 72px;
+    padding: 58px 20px 72px;
     display: flex; flex-direction: column; gap: 26px;
   }
   .mono{
@@ -131,7 +137,7 @@
     display: flex; align-items: center; gap: 10px;
     padding: 11px 12px; text-align: left; min-width: 0;
     background: var(--card); color: inherit; font: inherit;
-    border: 1.5px solid var(--rule); border-radius: 14px; cursor: pointer;
+    border: 1.5px solid var(--rule); border-radius: 18px; cursor: pointer;
     transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease;
   }
   .tab:hover{ transform: translateY(-2px); box-shadow: var(--shadow); }
@@ -158,16 +164,15 @@
 
   /* goal card */
   .goal{
-    background: var(--card); border: 1px solid var(--rule);
-    border-radius: 22px; box-shadow: var(--shadow-lift);
-    padding: 21px 24px; display: flex; align-items: center; gap: 20px;
+    background: linear-gradient(135deg, var(--card) 62%, var(--pink-wash));
+    border: 1.5px solid var(--rule);
+    border-radius: 26px; box-shadow: var(--shadow-lift);
+    padding: 23px 26px; display: flex; align-items: center; gap: 20px;
     position: relative; overflow: hidden;
+    transition: background .4s ease;
   }
-  .goal::before{
-    content:""; position: absolute; inset: 0 auto 0 0; width: 5px;
-    background: linear-gradient(180deg, var(--pink), var(--lav));
-  }
-  .goal.complete::before{ background: var(--mint); }
+  /* Completion recolours the whole wash rather than a rail down the edge. */
+  .goal.complete{ background: linear-gradient(135deg, var(--card) 62%, var(--mint-wash)); }
   .goal-body{ flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
   .goal-label{
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -216,10 +221,10 @@
   }
 
   /* systems */
-  .systems{ display: flex; flex-direction: column; gap: 11px; }
+  .systems{ display: flex; flex-direction: column; gap: 13px; }
   .sys{
-    background: var(--card); border: 1px solid var(--rule);
-    border-radius: 16px; overflow: hidden; position: relative;
+    background: var(--card); border: 1.5px solid var(--rule);
+    border-radius: 22px; overflow: hidden; position: relative;
     transition: border-color .3s ease;
   }
   .sys.is-done{ border-color: color-mix(in srgb, var(--mint) 45%, var(--rule)); }
@@ -253,7 +258,7 @@
     background: linear-gradient(90deg, var(--pink), var(--lav));
     transition: width .45s cubic-bezier(.34,1.4,.64,1);
   }
-  .sys.is-done .bar span{ background: var(--mint); }
+  .sys.is-done .bar span{ background: var(--mint-fill); }
   .sys-tools{
     display: flex; align-items: center; gap: 4px; align-self: start;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -276,7 +281,7 @@
   .tasks{ list-style: none; margin: 0; padding: 0 0 0 4px; }
   .task{
     display: grid; grid-template-columns: auto 1fr auto; gap: 11px; align-items: start;
-    padding: 10px 0 10px 20px; border-left: 2px solid var(--rule); position: relative;
+    padding: 11px 0 11px 20px; border-left: 2px solid var(--rule); position: relative;
   }
   .task::before{
     content:""; position: absolute; left: 0; top: 21px; width: 13px; height: 2px; background: var(--rule);
@@ -287,7 +292,7 @@
   }
   .box{
     position: relative; width: 21px; height: 21px; flex: none; margin-top: 1px; padding: 0;
-    border-radius: 7px; border: 2px solid var(--rule-strong); background: var(--card);
+    border-radius: 9px; border: 2px solid var(--rule-strong); background: var(--card);
     cursor: pointer; display: grid; place-items: center;
     transition: background .25s ease, border-color .25s ease, transform .18s ease;
   }
@@ -297,10 +302,10 @@
     width: 12px; height: 12px; opacity: 0; transform: scale(.4);
     transition: opacity .2s ease, transform .25s cubic-bezier(.34,1.6,.64,1);
   }
-  .task.done .box{ background: var(--mint); border-color: var(--mint); }
+  .task.done .box{ background: var(--mint-fill); border-color: var(--mint-fill); }
   .task.done .box svg{ opacity: 1; transform: scale(1); }
   .task-text{ min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .task-title{ font-weight: 600; font-size: 14.5px; line-height: 1.4; transition: color .3s ease; }
+  .task-title{ font-weight: 600; font-size: 15px; line-height: 1.45; transition: color .3s ease; }
   .task.done .task-title{
     color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--mint);
   }
@@ -320,7 +325,7 @@
     font-family: 'Quicksand', system-ui, sans-serif;
     font-size: 13.5px; font-weight: 600; color: var(--ink);
     background: var(--card-sunk); border: 1.5px solid var(--rule);
-    border-radius: 10px; padding: 8px 12px; outline: none;
+    border-radius: 13px; padding: 9px 13px; outline: none;
     transition: border-color .2s ease;
   }
   .addrow input.dod-in{
@@ -331,9 +336,10 @@
   .addrow input:focus{ border-color: var(--pink); }
   .btn{
     font-family: 'Baloo 2', ui-rounded, system-ui, sans-serif;
-    font-weight: 700; font-size: 14px; border: 0; border-radius: 10px;
-    cursor: pointer; padding: 8px 16px; color: #fff;
+    font-weight: 700; font-size: 14px; border: 0; border-radius: 14px;
+    cursor: pointer; padding: 9px 18px; color: #fff;
     background: linear-gradient(135deg, var(--pink), var(--lav));
+    box-shadow: 0 8px 18px var(--shadow-glow, rgba(124,196,247,.25));
     transition: transform .15s ease;
   }
   .btn:hover{ transform: translateY(-1px); }
@@ -350,7 +356,7 @@
   /* empty states */
   .empty{
     background: var(--card); border: 1.5px dashed var(--rule-strong);
-    border-radius: 16px; padding: 30px 24px; text-align: center;
+    border-radius: 20px; padding: 32px 26px; text-align: center;
     display: flex; flex-direction: column; align-items: center; gap: 5px;
   }
   .empty .emo{ font-size: 34px; line-height: 1; }
@@ -420,8 +426,8 @@
   }
   .gate-card{
     background: var(--card); border: 1px solid var(--rule);
-    border-radius: 22px; box-shadow: var(--shadow-lift);
-    padding: 32px 30px; width: 100%; max-width: 380px;
+    border-radius: 26px; box-shadow: var(--shadow-lift);
+    padding: 34px 30px; width: 100%; max-width: 380px;
     display: flex; flex-direction: column; gap: 5px; text-align: center;
   }
   .gate-emo{ font-size: 38px; line-height: 1; }
@@ -435,7 +441,7 @@
     font-family: 'Quicksand', system-ui, sans-serif;
     font-size: 15px; font-weight: 600; color: var(--ink);
     background: var(--card-sunk); border: 1.5px solid var(--rule);
-    border-radius: 12px; padding: 11px 14px; outline: none; text-align: center;
+    border-radius: 15px; padding: 12px 15px; outline: none; text-align: center;
     transition: border-color .2s ease;
   }
   .gate-card input:focus{ border-color: var(--pink); }
@@ -456,8 +462,21 @@
     background: var(--card-sunk); padding: 1px 5px; border-radius: 5px;
   }
 
-  /* ---------- sync status ---------- */
+  /* ---------- top bar controls ---------- */
   .topbar{ display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  /* Fixed rather than in the top bar: the top bar lives inside #app, so a
+     signed-out visitor on a dark-mode device could not reach the light theme. */
+  .theme-btn{
+    position: fixed; top: 13px; right: 13px; z-index: 90;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--card); border: 1px solid var(--rule); border-radius: 999px;
+    padding: 5px 13px 5px 10px; cursor: pointer; color: var(--ink-soft);
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px;
+    transition: border-color .2s ease, color .2s ease, transform .15s ease;
+  }
+  .theme-btn:hover{ border-color: var(--pink); color: var(--ink); transform: translateY(-1px); }
+  .theme-btn:focus-visible{ outline: 2px solid var(--lav); outline-offset: 2px; }
+  .theme-btn .ico{ font-size: 13px; line-height: 1; }
   .sync{
     display: inline-flex; align-items: center; gap: 7px;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -480,7 +499,7 @@
   /* ---------- one-time import ---------- */
   .import{
     background: var(--lav-wash); border: 1.5px solid color-mix(in srgb, var(--lav) 35%, var(--rule));
-    border-radius: 16px; padding: 16px 18px;
+    border-radius: 20px; padding: 17px 19px;
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   }
   .import p{ margin: 0; flex: 1 1 260px; font-size: 14px; color: var(--ink); }
@@ -496,8 +515,58 @@
     *{ animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   }
 </style>
+<script>
+/*
+  Runs before the body renders so a saved choice never flashes the other theme.
+  Deliberately not in the module below: modules are deferred, which would paint
+  the wrong theme first. Without this the page could only ever follow the OS,
+  so anyone on a dark-mode device had no way to reach the light design.
+*/
+(function(){
+  var KEY = 'cute-todo-theme';           // 'auto' | 'light' | 'dark'
+  var MODES = ['auto', 'light', 'dark'];
+  var FACE = { auto: ['🌗','Auto'], light: ['☀️','Light'], dark: ['🌙','Dark'] };
+
+  function read(){
+    try { var v = localStorage.getItem(KEY); return MODES.indexOf(v) > -1 ? v : 'auto'; }
+    catch (e){ return 'auto'; }
+  }
+  function paint(mode){
+    if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', mode);
+  }
+
+  var mode = read();
+  paint(mode);
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var btn = document.getElementById('themeBtn');
+    var ico = document.getElementById('themeIco');
+    var lbl = document.getElementById('themeLabel');
+    if (!btn) return;
+
+    function show(){
+      ico.textContent = FACE[mode][0];
+      lbl.textContent = FACE[mode][1];
+      btn.title = 'Theme: ' + FACE[mode][1] + ' — tap to change';
+    }
+    show();
+
+    btn.addEventListener('click', function(){
+      mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+      paint(mode);
+      show();
+      try { localStorage.setItem(KEY, mode); } catch (e){}
+    });
+  });
+})();
+</script>
 </head>
 <body>
+
+<button class="theme-btn" id="themeBtn" type="button" aria-label="Change theme">
+  <span class="ico" id="themeIco">🌗</span><span id="themeLabel">Auto</span>
+</button>
 
 <div class="gate" id="gate" hidden>
   <div class="gate-card">
